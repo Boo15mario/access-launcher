@@ -1,0 +1,15 @@
+.PHONY: srpm
+
+spec ?= access-launcher.spec
+outdir ?= .
+
+name := $(shell rpmspec -q --qf '%{name}' $(spec))
+version := $(shell rpmspec -q --qf '%{version}' $(spec))
+tarball := $(outdir)/$(name)-$(version).tar.gz
+
+srpm:
+	mkdir -p $(outdir)
+	tar --exclude='./.git' --exclude='./.git/*' --exclude='./target' --exclude='./fedora-*' \
+		--transform "s|^|$(name)-$(version)/|" \
+		-czf $(tarball) .
+	rpmbuild -bs --define "_sourcedir $(outdir)" --define "_srcrpmdir $(outdir)" $(spec)

@@ -4,7 +4,7 @@ Release:        1%{?dist}
 Summary:        GTK4 app launcher that groups installed apps by category
 
 License:        GPL-3.0-or-later
-URL:            https://example.com/access-launcher
+URL:            https://github.com/boo15mario/access-launcher
 Source0:        %{name}-%{version}.tar.gz
 
 BuildRequires:  cargo
@@ -22,15 +22,17 @@ applications by category and launches them from a two-pane interface.
 %autosetup -n %{name}-%{version}
 
 %build
-%cargo_build
+CARGO_NET_OFFLINE=1 cargo build --release --locked
 
 %install
-%cargo_install
-install -Dpm 0644 access-launcher.desktop \
-    %{buildroot}%{_datadir}/applications/access-launcher.desktop
+install -Dm0755 target/release/access-launcher \
+    %{buildroot}%{_bindir}/access-launcher
+desktop-file-install --dir=%{buildroot}%{_datadir}/applications \
+    access-launcher.desktop
 
 %check
-desktop-file-validate %{buildroot}%{_datadir}/applications/access-launcher.desktop
+CARGO_NET_OFFLINE=1 cargo test --release --locked
+desktop-file-validate access-launcher.desktop
 
 %files
 %license LICENSE
