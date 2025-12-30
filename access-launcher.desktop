@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Access Launcher
+Comment=Lists installed applications by category and launches them
+Exec=access-launcher
+Icon=access-launcher
+Terminal=false
+Categories=Utility;GTK;
+StartupNotify=true
