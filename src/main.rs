@@ -1,6 +1,6 @@
 use gtk4::prelude::*;
 use gtk4::{self as gtk, gio, Application, ApplicationWindow, Orientation};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -78,6 +78,20 @@ fn build_pane(title: &str, list_box: &gtk::ListBox) -> gtk::Box {
     container.append(&scroller);
 
     container
+}
+
+fn show_error_dialog(parent: &impl IsA<gtk::Window>, title: &str, details: &str) {
+    let dialog = gtk::MessageDialog::builder()
+        .message_type(gtk::MessageType::Error)
+        .buttons(gtk::ButtonsType::Close)
+        .text(title)
+        .secondary_text(details)
+        .build();
+    dialog.set_transient_for(Some(parent));
+    dialog.set_modal(true);
+    dialog.set_destroy_with_parent(true);
+    dialog.connect_response(|dialog, _| dialog.close());
+    dialog.present();
 }
 
 #[derive(Clone, Debug)]
@@ -259,6 +273,25 @@ fn parse_desktop_entry(
     })
 }
 
+fn exec_looks_valid(exec: &str) -> bool {
+    let exec = exec.trim();
+    if exec.is_empty() {
+        return false;
+    }
+    let argv = match gtk::glib::shell_parse_argv(exec) {
+        Ok(argv) => argv,
+        Err(_) => return true,
+    };
+    let Some(command) = argv.first().and_then(|arg| arg.to_str()) else {
+        return true;
+    };
+    if command.starts_with('/') {
+        Path::new(command).exists()
+    } else {
+        true
+    }
+}
+
 fn collect_desktop_entries() -> Vec<DesktopEntry> {
     let mut files = Vec::new();
     for dir in desktop_dirs() {
@@ -273,8 +306,7 @@ fn collect_desktop_entries() -> Vec<DesktopEntry> {
             .map(|entry| entry.to_string())
             .collect::<Vec<_>>()
     });
-    let mut seen_ids = HashSet::new();
-    let mut entries = Vec::new();
+    let mut entries_by_id: HashMap<String, DesktopEntry> = HashMap::new();
 
     for path in files {
         let id = path
@@ -282,18 +314,26 @@ fn collect_desktop_entries() -> Vec<DesktopEntry> {
             .and_then(|name| name.to_str())
             .map(|name| name.to_string());
         if let Some(id) = id {
-            if seen_ids.contains(&id) {
-                continue;
-            }
             if let Some(entry) =
                 parse_desktop_entry(&path, current_lang.as_deref(), current_desktops.as_deref())
             {
-                seen_ids.insert(id);
-                entries.push(entry);
+                let new_valid = exec_looks_valid(&entry.exec);
+                match entries_by_id.get(&id) {
+                    None => {
+                        entries_by_id.insert(id, entry);
+                    }
+                    Some(existing) => {
+                        let existing_valid = exec_looks_valid(&existing.exec);
+                        if !existing_valid && new_valid {
+                            entries_by_id.insert(id, entry);
+                        }
+                    }
+                }
             }
         }
     }
 
+    let mut entries: Vec<DesktopEntry> = entries_by_id.into_values().collect();
     entries.sort_by_key(|entry| entry.name.to_ascii_lowercase());
     entries
 }
@@ -425,20 +465,6 @@ fn main() {
             });
         }
 
-        programs_list.connect_row_activated(|_, row| {
-            if let Some(path) = unsafe { row.data::<String>("desktop-path") } {
-                let path = unsafe { path.as_ref() };
-                if let Some(app_info) = gio::DesktopAppInfo::from_filename(path) {
-                    let files: Vec<gio::File> = Vec::new();
-                    if let Err(err) = app_info.launch(&files, None::<&gio::AppLaunchContext>) {
-                        eprintln!("Failed to launch {path}: {err}");
-                    }
-                } else {
-                    eprintln!("Failed to load desktop entry: {path}");
-                }
-            }
-        });
-
         categories_list.select_row(categories_list.row_at_index(0).as_ref());
 
         let left_pane = build_pane("Categories", &categories_list);
@@ -460,6 +486,34 @@ fn main() {
             .default_height(600)
             .child(&paned)
             .build();
+
+        let window_for_dialog = window.clone();
+        programs_list.connect_row_activated(move |_, row| {
+            if let Some(path) = unsafe { row.data::<String>("desktop-path") } {
+                let path = unsafe { path.as_ref() };
+                if let Some(app_info) = gio::DesktopAppInfo::from_filename(path) {
+                    let files: Vec<gio::File> = Vec::new();
+                    let launch_context =
+                        gtk::prelude::WidgetExt::display(&window_for_dialog).app_launch_context();
+                    if let Err(err) = app_info.launch(&files, Some(&launch_context)) {
+                        eprintln!("Failed to launch {path}: {err}");
+                        let app_name = app_info.name();
+                        show_error_dialog(
+                            &window_for_dialog,
+                            &format!("Failed to launch {app_name}"),
+                            err.message(),
+                        );
+                    }
+                } else {
+                    eprintln!("Failed to load desktop entry: {path}");
+                    show_error_dialog(
+                        &window_for_dialog,
+                        "Failed to load application",
+                        &format!("Could not read desktop entry at {path}"),
+                    );
+                }
+            }
+        });
 
         window.present();
     });
