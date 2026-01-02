@@ -17,7 +17,23 @@ fn maybe_print_version() -> bool {
     false
 }
 
+fn maybe_print_help() -> bool {
+    for arg in env::args().skip(1) {
+        if arg == "-h" || arg == "--help" {
+            println!(
+                "Usage: {name} [OPTIONS]\n\nOptions:\n  -h, --help     Show this help message\n  -v, --version  Show version information\n\nRunning without options starts the application.",
+                name = env!("CARGO_PKG_NAME")
+            );
+            return true;
+        }
+    }
+    false
+}
+
 fn main() {
+    if maybe_print_help() {
+        return;
+    }
     if maybe_print_version() {
         return;
     }

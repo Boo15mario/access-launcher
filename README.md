@@ -56,6 +56,8 @@ cargo run
 - Select a category in the left pane to filter applications.
 - Activate an app in the right pane to launch it.
 - Print the version: `access-launcher -v`
+- Show help: `access-launcher -h`
+- Run without flags to start the application normally.
 
 ## Development Notes
 - Entry point: `src/main.rs`.
