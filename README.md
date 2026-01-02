@@ -57,6 +57,9 @@ cargo run
 - Activate an app in the right pane to launch it.
 
 ## Development Notes
-- Source code lives in `src/main.rs`.
+- Entry point: `src/main.rs`.
+- Shared modules: `src/lib.rs`, `src/desktop.rs`, `src/ui.rs`.
+- Integration tests: `tests/desktop.rs`.
 - Formatting: `cargo fmt`
 - Linting: `cargo clippy`
+- Tests: `cargo test`

@@ -1,7 +1,11 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `src/main.rs` contains the GTK4 application entry point and UI logic.
+- `src/main.rs` contains the GTK4 application entry point.
+- `src/lib.rs` exposes shared modules for the binary and tests.
+- `src/desktop.rs` handles desktop entry parsing and category mapping.
+- `src/ui.rs` contains GTK4 UI helper functions.
+- `tests/desktop.rs` provides integration coverage for desktop entry parsing behavior.
 - `Cargo.toml` defines the Rust crate metadata and dependencies.
 - `access-launcher.desktop` provides the desktop entry used by the RPM build.
 - `access-launcher.spec` defines the Fedora RPM packaging.
@@ -13,7 +17,7 @@
 ## Build, Test, and Development Commands
 - `cargo build` compiles the application in debug mode.
 - `cargo run` builds (if needed) and launches the GTK app locally.
-- `cargo test` runs the test suite (none currently defined; add tests as you add modules).
+- `cargo test` runs the test suite.
 - `cargo fmt` formats Rust sources using rustfmt.
 - `cargo clippy` runs the linter for common Rust issues.
 - `make srpm` builds a local SRPM using the spec file.
@@ -26,8 +30,9 @@
 - Run `cargo fmt` before committing; use `cargo clippy` to catch warnings early.
 
 ## Testing Guidelines
-- No test framework is configured yet; use Rust’s built-in test runner when adding modules.
-- Place unit tests alongside code in `src/` using `#[cfg(test)]`.
+- Use Rust’s built-in test runner when adding modules.
+- Prefer integration tests in `tests/` for shared desktop parsing behavior.
+- Keep focused unit tests alongside code in `src/` using `#[cfg(test)]` when needed.
 - Name tests with clear behavior verbs (e.g., `parses_desktop_entry_name`).
 - Run all tests with `cargo test`.
 
