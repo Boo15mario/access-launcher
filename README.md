@@ -55,6 +55,7 @@ cargo run
 ## Usage
 - Select a category in the left pane to filter applications.
 - Activate an app in the right pane to launch it.
+- Print the version: `access-launcher -v`
 
 ## Development Notes
 - Entry point: `src/main.rs`.

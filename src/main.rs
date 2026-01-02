@@ -4,9 +4,24 @@ use access_launcher::ui::{
 };
 use gtk4::prelude::*;
 use gtk4::{self as gtk, gio, Application, ApplicationWindow, Orientation};
+use std::env;
 use std::rc::Rc;
 
+fn maybe_print_version() -> bool {
+    for arg in env::args().skip(1) {
+        if arg == "-v" || arg == "--version" {
+            println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+            return true;
+        }
+    }
+    false
+}
+
 fn main() {
+    if maybe_print_version() {
+        return;
+    }
+
     let app = Application::builder()
         .application_id("com.example.AccessLauncher")
         .build();
