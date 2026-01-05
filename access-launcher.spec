@@ -1,5 +1,5 @@
 Name:           access-launcher
-Version:        0.2.1
+Version:        0.3.0
 Release:        1%{?dist}
 Summary:        GTK4 app launcher that groups installed apps by category
 

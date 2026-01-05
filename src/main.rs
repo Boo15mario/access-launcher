@@ -103,6 +103,7 @@ fn main() {
             .default_height(600)
             .child(&paned)
             .build();
+        window.maximize();
 
         let window_for_dialog = window.clone();
         programs_list.connect_row_activated(move |_, row| {
