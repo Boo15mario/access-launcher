@@ -1,5 +1,5 @@
 use gtk4::glib;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -12,16 +12,107 @@ pub struct DesktopEntry {
     pub path: PathBuf,
 }
 
+fn push_unique(dirs: &mut Vec<PathBuf>, seen: &mut HashSet<PathBuf>, path: PathBuf) {
+    if seen.insert(path.clone()) {
+        dirs.push(path);
+    }
+}
+
 fn desktop_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
-    if let Ok(home) = env::var("HOME") {
-        let home = PathBuf::from(home);
-        dirs.push(home.join(".local/share/applications"));
-        dirs.push(home.join(".local/share/flatpak/exports/share/applications"));
+    let mut seen = HashSet::new();
+
+    let data_home = env::var("XDG_DATA_HOME")
+        .ok()
+        .and_then(|value| {
+            if value.is_empty() {
+                None
+            } else {
+                Some(PathBuf::from(value))
+            }
+        })
+        .or_else(|| {
+            env::var("HOME")
+                .ok()
+                .map(|home| PathBuf::from(home).join(".local/share"))
+        });
+    if let Some(data_home) = data_home {
+        push_unique(&mut dirs, &mut seen, data_home.join("applications"));
+        push_unique(
+            &mut dirs,
+            &mut seen,
+            data_home.join("flatpak/exports/share/applications"),
+        );
     }
-    dirs.push(PathBuf::from("/usr/local/share/applications"));
-    dirs.push(PathBuf::from("/usr/share/applications"));
-    dirs.push(PathBuf::from("/var/lib/flatpak/exports/share/applications"));
+
+    let mut added_xdg = false;
+    if let Ok(data_dirs) = env::var("XDG_DATA_DIRS") {
+        for dir in data_dirs.split(':').filter(|dir| !dir.is_empty()) {
+            push_unique(
+                &mut dirs,
+                &mut seen,
+                PathBuf::from(dir).join("applications"),
+            );
+            added_xdg = true;
+        }
+    }
+    if !added_xdg {
+        push_unique(
+            &mut dirs,
+            &mut seen,
+            PathBuf::from("/usr/local/share/applications"),
+        );
+        push_unique(
+            &mut dirs,
+            &mut seen,
+            PathBuf::from("/usr/share/applications"),
+        );
+    }
+
+    push_unique(
+        &mut dirs,
+        &mut seen,
+        PathBuf::from("/var/lib/flatpak/exports/share/applications"),
+    );
+
+    // NixOS profiles are not always present in XDG_DATA_DIRS.
+    push_unique(
+        &mut dirs,
+        &mut seen,
+        PathBuf::from("/run/current-system/sw/share/applications"),
+    );
+    push_unique(
+        &mut dirs,
+        &mut seen,
+        PathBuf::from("/nix/var/nix/profiles/default/share/applications"),
+    );
+    if let Ok(home) = env::var("HOME") {
+        push_unique(
+            &mut dirs,
+            &mut seen,
+            PathBuf::from(home).join(".nix-profile/share/applications"),
+        );
+    }
+    if let Ok(user) = env::var("USER") {
+        if !user.is_empty() {
+            push_unique(
+                &mut dirs,
+                &mut seen,
+                PathBuf::from(format!(
+                    "/etc/profiles/per-user/{user}/share/applications"
+                )),
+            );
+        }
+    }
+    if let Ok(nix_profiles) = env::var("NIX_PROFILES") {
+        for profile in nix_profiles.split_whitespace().filter(|p| !p.is_empty()) {
+            push_unique(
+                &mut dirs,
+                &mut seen,
+                PathBuf::from(profile).join("share/applications"),
+            );
+        }
+    }
     dirs
 }
 

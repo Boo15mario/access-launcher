@@ -28,8 +28,17 @@ sudo pacman -S --needed rust cargo gtk4 base-devel pkgconf
 
 # Gentoo
 sudo emerge --ask dev-lang/rust gui-libs/gtk:4 sys-devel/gcc pkgconf
+
+# NixOS (temporary shell)
+nix-shell -p rustc cargo pkg-config gtk4 gcc
+# Or:
+nix shell nixpkgs#rustc nixpkgs#cargo nixpkgs#pkg-config nixpkgs#gtk4 nixpkgs#gcc
 ```
 If you do not have Rust installed, see `https://rustup.rs` for a standard setup.
+
+NixOS runtime note: Access Launcher scans `XDG_DATA_HOME`, `XDG_DATA_DIRS`, and common
+Nix profile paths for `.desktop` files. If your apps do not appear, ensure your
+profile `share/applications` paths are present in `XDG_DATA_DIRS` (or `NIX_PROFILES`).
 
 ### Optional Tools
 - rustfmt and clippy (recommended):
@@ -50,6 +59,72 @@ If you do not have Rust installed, see `https://rustup.rs` for a standard setup.
 ```bash
 cargo build
 cargo run
+```
+
+## Install (NixOS)
+Add a local build to `environment.systemPackages` or `home.packages`:
+```nix
+# configuration.nix or home.nix
+{
+  environment.systemPackages = [
+    (pkgs.rustPlatform.buildRustPackage {
+      pname = "access-launcher";
+      version = "git";
+      src = /path/to/access-launcher;
+      cargoLock.lockFile = /path/to/access-launcher/Cargo.lock;
+      nativeBuildInputs = [ pkgs.pkg-config ];
+      buildInputs = [ pkgs.gtk4 ];
+    })
+  ];
+}
+```
+Home Manager variant:
+```nix
+# home.nix
+{
+  home.packages = [
+    (pkgs.rustPlatform.buildRustPackage {
+      pname = "access-launcher";
+      version = "git";
+      src = /path/to/access-launcher;
+      cargoLock.lockFile = /path/to/access-launcher/Cargo.lock;
+      nativeBuildInputs = [ pkgs.pkg-config ];
+      buildInputs = [ pkgs.gtk4 ];
+    })
+  ];
+}
+```
+Flake example:
+```nix
+{
+  description = "Access Launcher";
+
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs";
+
+  outputs = { self, nixpkgs }:
+    let
+      system = "x86_64-linux";
+      pkgs = import nixpkgs { inherit system; };
+    in {
+      packages.${system}.default = pkgs.rustPlatform.buildRustPackage {
+        pname = "access-launcher";
+        version = "git";
+        src = self;
+        cargoLock.lockFile = ./Cargo.lock;
+        nativeBuildInputs = [ pkgs.pkg-config ];
+        buildInputs = [ pkgs.gtk4 ];
+      };
+    };
+}
+```
+Usage:
+```bash
+nix build
+./result/bin/access-launcher
+```
+Or:
+```bash
+nix run
 ```
 
 ## Usage
