@@ -51,6 +51,7 @@
   - Debian/Ubuntu: `sudo apt-get install -y rustc cargo libgtk-4-dev build-essential pkg-config`
   - Arch Linux: `sudo pacman -S --needed rust cargo gtk4 base-devel pkgconf`
   - Gentoo: `sudo emerge --ask dev-lang/rust gui-libs/gtk:4 sys-devel/gcc pkgconf`
+  - NixOS: `nix-shell -p rustc cargo pkg-config gtk4 gcc` (or `nix shell nixpkgs#rustc nixpkgs#cargo nixpkgs#pkg-config nixpkgs#gtk4 nixpkgs#gcc`)
 - Optional tools:
   - rustfmt and clippy:
     - rustup: `rustup component add rustfmt clippy`
@@ -59,9 +60,11 @@
       - Debian/Ubuntu: `sudo apt-get install -y rustfmt clippy`
       - Arch Linux: `sudo pacman -S --needed rustfmt clippy`
       - Gentoo: `sudo emerge --ask dev-util/rustfmt dev-util/clippy`
+      - NixOS: `nix-shell -p rustfmt clippy` (or `nix shell nixpkgs#rustfmt nixpkgs#clippy`)
   - Auto-rebuild: `cargo install cargo-watch`
   - Debugger packages:
     - Fedora: `sudo dnf install -y gdb lldb`
     - Debian/Ubuntu: `sudo apt-get install -y gdb lldb`
     - Arch Linux: `sudo pacman -S --needed gdb lldb`
     - Gentoo: `sudo emerge --ask sys-devel/gdb sys-devel/lldb`
+    - NixOS: `nix-shell -p gdb lldb` (or `nix shell nixpkgs#gdb nixpkgs#lldb`)
