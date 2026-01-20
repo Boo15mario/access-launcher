@@ -315,6 +315,10 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
             .and_then(|name| name.to_str())
             .map(|name| name.to_string());
         if let Some(id) = id {
+            if id == "access-launcher.desktop" {
+                continue;
+            }
+
             if let Some(entry) =
                 parse_desktop_entry(&path, current_lang.as_deref(), current_desktops.as_deref())
             {
