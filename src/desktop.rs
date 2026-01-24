@@ -139,8 +139,8 @@ fn walk_desktop_files(dir: &Path, files: &mut Vec<PathBuf>) {
     }
 }
 
-pub fn normalize_lang_tag(lang: &str) -> String {
-    lang.split(['.', '@']).next().unwrap_or("").to_string()
+pub fn normalize_lang_tag(lang: &str) -> &str {
+    lang.split(['.', '@']).next().unwrap_or("")
 }
 
 pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
