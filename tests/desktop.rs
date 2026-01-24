@@ -196,10 +196,10 @@ fn build_category_map_groups_and_sorts_entries() {
         },
     ];
     let map = build_category_map(&entries);
-    let dev_entries = map
+    let dev_indices = map
         .get("Development")
         .expect("development category");
-    assert_eq!(dev_entries[0].name, "Aapp");
-    assert_eq!(dev_entries[1].name, "bApp");
+    assert_eq!(entries[dev_indices[0]].name, "Aapp");
+    assert_eq!(entries[dev_indices[1]].name, "bApp");
     assert!(map.contains_key("Games"));
 }
