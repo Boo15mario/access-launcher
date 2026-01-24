@@ -6,6 +6,7 @@ version = 4
 name = "access-launcher"
 version = "0.4.1"
 dependencies = [
+ "futures-channel",
  "gtk4",
 ]
 

@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 gtk4 = { version = "0.7", package = "gtk4" }
+futures-channel = "0.3.31"
