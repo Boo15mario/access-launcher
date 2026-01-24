@@ -98,9 +98,7 @@ fn desktop_dirs() -> Vec<PathBuf> {
             push_unique(
                 &mut dirs,
                 &mut seen,
-                PathBuf::from(format!(
-                    "/etc/profiles/per-user/{user}/share/applications"
-                )),
+                PathBuf::from(format!("/etc/profiles/per-user/{user}/share/applications")),
             );
         }
     }
@@ -131,11 +129,10 @@ fn walk_desktop_files(dir: &Path, files: &mut Vec<PathBuf>) {
 
         if file_type.is_dir() {
             walk_desktop_files(&path, files);
-        } else if file_type.is_file() || file_type.is_symlink() {
-            if path.extension().and_then(|ext| ext.to_str()) == Some("desktop") {
+        } else if (file_type.is_file() || file_type.is_symlink())
+            && path.extension().and_then(|ext| ext.to_str()) == Some("desktop") {
                 files.push(path);
             }
-        }
     }
 }
 
@@ -319,17 +316,29 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
                 continue;
             }
 
+            // Optimization: If we already have a valid entry for this ID (e.g. from a higher
+            // priority directory), we can skip parsing the file entirely.
+            let existing_is_valid = if let Some(existing) = entries_by_id.get(&id) {
+                exec_looks_valid(&existing.exec)
+            } else {
+                false
+            };
+
+            if existing_is_valid {
+                continue;
+            }
+
             if let Some(entry) =
                 parse_desktop_entry(&path, current_lang.as_deref(), current_desktops.as_deref())
             {
-                let new_valid = exec_looks_valid(&entry.exec);
                 match entries_by_id.get(&id) {
                     None => {
                         entries_by_id.insert(id, entry);
                     }
-                    Some(existing) => {
-                        let existing_valid = exec_looks_valid(&existing.exec);
-                        if !existing_valid && new_valid {
+                    Some(_) => {
+                        // If we are here, the existing entry is known to be invalid.
+                        // We replace it only if the new entry is valid.
+                        if exec_looks_valid(&entry.exec) {
                             entries_by_id.insert(id, entry);
                         }
                     }

@@ -1,6 +1,6 @@
 use access_launcher::desktop::{
-    build_category_map, exec_looks_valid, matches_lang_tag, normalize_lang_tag, parse_bool,
-    parse_desktop_entry, DesktopEntry,
+    build_category_map, collect_desktop_entries, exec_looks_valid, matches_lang_tag,
+    normalize_lang_tag, parse_bool, parse_desktop_entry, DesktopEntry,
 };
 use std::env;
 use std::fs;
@@ -87,8 +87,7 @@ Exec=app
 "#,
         "access-launcher-localized",
     );
-    let entry =
-        parse_desktop_entry(&file.path, Some("en_US.UTF-8"), None).expect("entry present");
+    let entry = parse_desktop_entry(&file.path, Some("en_US.UTF-8"), None).expect("entry present");
     assert_eq!(entry.name, "Localized Name");
 }
 
@@ -196,10 +195,99 @@ fn build_category_map_groups_and_sorts_entries() {
         },
     ];
     let map = build_category_map(&entries);
-    let dev_entries = map
-        .get("Development")
-        .expect("development category");
+    let dev_entries = map.get("Development").expect("development category");
     assert_eq!(dev_entries[0].name, "Aapp");
     assert_eq!(dev_entries[1].name, "bApp");
     assert!(map.contains_key("Games"));
+}
+
+fn create_desktop_file_for_override(dir: &std::path::PathBuf, name: &str, exec: &str) {
+    fs::create_dir_all(dir.join("applications")).unwrap();
+    let content = format!(
+        r#"[Desktop Entry]
+Type=Application
+Name={}
+Exec={}
+Categories=Utility;
+"#,
+        name, exec
+    );
+    fs::write(dir.join(format!("applications/{}.desktop", name)), content).unwrap();
+}
+
+#[test]
+fn test_override_logic() {
+    let temp_home = env::temp_dir().join(format!("test-override-home-{}", std::process::id()));
+    let temp_data = env::temp_dir().join(format!("test-override-data-{}", std::process::id()));
+
+    if temp_home.exists() {
+        fs::remove_dir_all(&temp_home).unwrap();
+    }
+    if temp_data.exists() {
+        fs::remove_dir_all(&temp_data).unwrap();
+    }
+
+    env::set_var("XDG_DATA_HOME", &temp_home);
+    env::set_var("XDG_DATA_DIRS", &temp_data);
+    env::remove_var("NIX_PROFILES");
+
+    // Case 1: User (Invalid) vs System (Valid) -> System should win
+    create_desktop_file_for_override(&temp_home, "case1", "/invalid/path/exec");
+    create_desktop_file_for_override(&temp_data, "case1", "/bin/true");
+
+    // Case 2: User (Valid) vs System (Valid) -> User should win (Optimization skips System)
+    // We can verify User wins by checking a property (e.g. Exec is different, but both valid)
+    // /bin/echo is valid. /bin/ls is valid.
+    create_desktop_file_for_override(&temp_home, "case2", "/bin/echo user");
+    create_desktop_file_for_override(&temp_data, "case2", "/bin/ls system");
+
+    // Case 3: User (Valid) vs System (Invalid) -> User should win
+    create_desktop_file_for_override(&temp_home, "case3", "/bin/true");
+    create_desktop_file_for_override(&temp_data, "case3", "/invalid/path/exec");
+
+    // Case 4: User (Invalid) vs System (Invalid) -> User should win (First encountered)
+    create_desktop_file_for_override(&temp_home, "case4", "/invalid/user");
+    create_desktop_file_for_override(&temp_data, "case4", "/invalid/system");
+
+    let entries = collect_desktop_entries();
+
+    let get_exec = |name: &str| -> String {
+        entries
+            .iter()
+            .find(|e| e.path.file_stem().unwrap().to_str().unwrap() == name)
+            .unwrap()
+            .exec
+            .clone()
+    };
+
+    // Case 1: System wins
+    assert_eq!(
+        get_exec("case1"),
+        "/bin/true",
+        "Case 1: System (valid) should override User (invalid)"
+    );
+
+    // Case 2: User wins
+    assert_eq!(
+        get_exec("case2"),
+        "/bin/echo user",
+        "Case 2: User (valid) should be kept over System (valid)"
+    );
+
+    // Case 3: User wins
+    assert_eq!(
+        get_exec("case3"),
+        "/bin/true",
+        "Case 3: User (valid) should be kept over System (invalid)"
+    );
+
+    // Case 4: User wins (First one)
+    assert_eq!(
+        get_exec("case4"),
+        "/invalid/user",
+        "Case 4: User (invalid) should be kept over System (invalid)"
+    );
+
+    fs::remove_dir_all(&temp_home).unwrap();
+    fs::remove_dir_all(&temp_data).unwrap();
 }
