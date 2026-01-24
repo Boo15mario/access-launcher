@@ -154,10 +154,8 @@ pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
 }
 
 pub fn parse_bool(value: &str) -> bool {
-    matches!(
-        value.trim().to_ascii_lowercase().as_str(),
-        "true" | "1" | "yes"
-    )
+    let value = value.trim();
+    value.eq_ignore_ascii_case("true") || value == "1" || value.eq_ignore_ascii_case("yes")
 }
 
 pub fn parse_desktop_entry(
@@ -183,6 +181,9 @@ pub fn parse_desktop_entry(
             continue;
         }
         if line.starts_with('[') && line.ends_with(']') {
+            if in_entry {
+                break;
+            }
             in_entry = line == "[Desktop Entry]";
             continue;
         }
