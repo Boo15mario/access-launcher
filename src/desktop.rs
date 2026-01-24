@@ -148,7 +148,9 @@ pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
         return false;
     }
     let lang = normalize_lang_tag(lang);
-    lang == tag || lang.starts_with(&format!("{tag}_")) || tag.starts_with(&lang)
+    lang == tag
+        || (lang.starts_with(tag) && lang.as_bytes().get(tag.len()) == Some(&b'_'))
+        || tag.starts_with(lang)
 }
 
 pub fn parse_bool(value: &str) -> bool {
