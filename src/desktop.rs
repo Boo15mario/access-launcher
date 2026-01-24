@@ -139,8 +139,8 @@ fn walk_desktop_files(dir: &Path, files: &mut Vec<PathBuf>) {
     }
 }
 
-pub fn normalize_lang_tag(lang: &str) -> String {
-    lang.split(['.', '@']).next().unwrap_or("").to_string()
+pub fn normalize_lang_tag(lang: &str) -> &str {
+    lang.split(['.', '@']).next().unwrap_or("")
 }
 
 pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
@@ -148,7 +148,9 @@ pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
         return false;
     }
     let lang = normalize_lang_tag(lang);
-    lang == tag || lang.starts_with(&format!("{tag}_")) || tag.starts_with(&lang)
+    lang == tag
+        || (lang.starts_with(tag) && lang.as_bytes().get(tag.len()) == Some(&b'_'))
+        || tag.starts_with(lang)
 }
 
 pub fn parse_bool(value: &str) -> bool {
