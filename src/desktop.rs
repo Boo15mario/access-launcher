@@ -343,16 +343,16 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
     entries
 }
 
-pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<DesktopEntry>> {
-    let mut map: BTreeMap<String, Vec<DesktopEntry>> = BTreeMap::new();
-    for entry in entries {
+pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usize>> {
+    let mut map: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+    for (i, entry) in entries.iter().enumerate() {
         let bucket = map_categories(&entry.categories);
         map.entry(bucket.to_string())
             .or_default()
-            .push(entry.clone());
+            .push(i);
     }
     for programs in map.values_mut() {
-        programs.sort_by_key(|entry| entry.name.to_ascii_lowercase());
+        programs.sort_by_key(|&i| entries[i].name.to_ascii_lowercase());
     }
     map
 }
