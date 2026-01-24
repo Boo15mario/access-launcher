@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "access-launcher"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "futures-channel",
  "gtk4",

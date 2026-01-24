@@ -2,7 +2,7 @@
 
 pkgs.rustPlatform.buildRustPackage rec {
   pname = "access-launcher";
-  version = "0.1.0";
+  version = "0.4.2";
 
   # IMPORTANT: Replace these with your actual GitHub repository details
   src = pkgs.fetchFromGitHub {
