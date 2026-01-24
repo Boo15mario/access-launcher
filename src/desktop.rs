@@ -13,7 +13,8 @@ pub struct DesktopEntry {
 }
 
 fn push_unique(dirs: &mut Vec<PathBuf>, seen: &mut HashSet<PathBuf>, path: PathBuf) {
-    if seen.insert(path.clone()) {
+    if !seen.contains(&path) {
+        seen.insert(path.clone());
         dirs.push(path);
     }
 }
@@ -98,9 +99,7 @@ fn desktop_dirs() -> Vec<PathBuf> {
             push_unique(
                 &mut dirs,
                 &mut seen,
-                PathBuf::from(format!(
-                    "/etc/profiles/per-user/{user}/share/applications"
-                )),
+                PathBuf::from(format!("/etc/profiles/per-user/{user}/share/applications")),
             );
         }
     }
