@@ -94,7 +94,6 @@ pub fn show_error_dialog(parent: &impl IsA<gtk::Window>, title: &str, details: &
 
 pub fn update_program_list(
     list_box: &gtk::ListBox,
-    _entries: &[DesktopEntry],
     category_map: &BTreeMap<String, Vec<DesktopEntry>>,
     category: &str,
 ) {

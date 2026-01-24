@@ -43,8 +43,7 @@ fn main() {
         .build();
 
     app.connect_activate(|app| {
-        let entries = Rc::new(collect_desktop_entries());
-        let category_map = Rc::new(build_category_map(&entries));
+        let category_map = Rc::new(build_category_map(collect_desktop_entries()));
         let categories = [
             "Accessories",
             "Audio/Video",
@@ -66,17 +65,16 @@ fn main() {
         }
 
         let programs_list = build_list_box("Programs list");
-        update_program_list(&programs_list, &entries, &category_map, "Internet");
+        update_program_list(&programs_list, &category_map, "Internet");
 
         {
-            let entries = Rc::clone(&entries);
             let category_map = Rc::clone(&category_map);
             let programs_list = programs_list.clone();
             categories_list.connect_row_selected(move |_, row| {
                 if let Some(row) = row {
                     if let Some(category) = unsafe { row.data::<String>("category") } {
                         let category = unsafe { category.as_ref() };
-                        update_program_list(&programs_list, &entries, &category_map, category);
+                        update_program_list(&programs_list, &category_map, category);
                     }
                 }
             });

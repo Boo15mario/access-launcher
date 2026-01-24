@@ -87,8 +87,7 @@ Exec=app
 "#,
         "access-launcher-localized",
     );
-    let entry =
-        parse_desktop_entry(&file.path, Some("en_US.UTF-8"), None).expect("entry present");
+    let entry = parse_desktop_entry(&file.path, Some("en_US.UTF-8"), None).expect("entry present");
     assert_eq!(entry.name, "Localized Name");
 }
 
@@ -195,10 +194,8 @@ fn build_category_map_groups_and_sorts_entries() {
             path: PathBuf::from("/tmp/gameapp.desktop"),
         },
     ];
-    let map = build_category_map(&entries);
-    let dev_entries = map
-        .get("Development")
-        .expect("development category");
+    let map = build_category_map(entries);
+    let dev_entries = map.get("Development").expect("development category");
     assert_eq!(dev_entries[0].name, "Aapp");
     assert_eq!(dev_entries[1].name, "bApp");
     assert!(map.contains_key("Games"));

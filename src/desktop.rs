@@ -98,9 +98,7 @@ fn desktop_dirs() -> Vec<PathBuf> {
             push_unique(
                 &mut dirs,
                 &mut seen,
-                PathBuf::from(format!(
-                    "/etc/profiles/per-user/{user}/share/applications"
-                )),
+                PathBuf::from(format!("/etc/profiles/per-user/{user}/share/applications")),
             );
         }
     }
@@ -131,10 +129,10 @@ fn walk_desktop_files(dir: &Path, files: &mut Vec<PathBuf>) {
 
         if file_type.is_dir() {
             walk_desktop_files(&path, files);
-        } else if file_type.is_file() || file_type.is_symlink() {
-            if path.extension().and_then(|ext| ext.to_str()) == Some("desktop") {
-                files.push(path);
-            }
+        } else if (file_type.is_file() || file_type.is_symlink())
+            && path.extension().and_then(|ext| ext.to_str()) == Some("desktop")
+        {
+            files.push(path);
         }
     }
 }
@@ -343,13 +341,11 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
     entries
 }
 
-pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<DesktopEntry>> {
+pub fn build_category_map(entries: Vec<DesktopEntry>) -> BTreeMap<String, Vec<DesktopEntry>> {
     let mut map: BTreeMap<String, Vec<DesktopEntry>> = BTreeMap::new();
     for entry in entries {
         let bucket = map_categories(&entry.categories);
-        map.entry(bucket.to_string())
-            .or_default()
-            .push(entry.clone());
+        map.entry(bucket.to_string()).or_default().push(entry);
     }
     for programs in map.values_mut() {
         programs.sort_by_key(|entry| entry.name.to_ascii_lowercase());
