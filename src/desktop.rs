@@ -307,7 +307,7 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
             .map(|entry| entry.to_string())
             .collect::<Vec<_>>()
     });
-    let mut entries_by_id: HashMap<String, DesktopEntry> = HashMap::new();
+    let mut entries_by_id: HashMap<String, (DesktopEntry, bool)> = HashMap::new();
 
     for path in files {
         let id = path
@@ -322,15 +322,19 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
             if let Some(entry) =
                 parse_desktop_entry(&path, current_lang.as_deref(), current_desktops.as_deref())
             {
-                let new_valid = exec_looks_valid(&entry.exec);
-                match entries_by_id.get(&id) {
-                    None => {
-                        entries_by_id.insert(id, entry);
+                use std::collections::hash_map::Entry;
+                match entries_by_id.entry(id) {
+                    Entry::Vacant(vacant) => {
+                        let new_valid = exec_looks_valid(&entry.exec);
+                        vacant.insert((entry, new_valid));
                     }
-                    Some(existing) => {
-                        let existing_valid = exec_looks_valid(&existing.exec);
-                        if !existing_valid && new_valid {
-                            entries_by_id.insert(id, entry);
+                    Entry::Occupied(mut occupied) => {
+                        let (_, existing_valid) = occupied.get();
+                        if !*existing_valid {
+                            let new_valid = exec_looks_valid(&entry.exec);
+                            if new_valid {
+                                occupied.insert((entry, new_valid));
+                            }
                         }
                     }
                 }
@@ -338,7 +342,10 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
         }
     }
 
-    let mut entries: Vec<DesktopEntry> = entries_by_id.into_values().collect();
+    let mut entries: Vec<DesktopEntry> = entries_by_id
+        .into_values()
+        .map(|(entry, _)| entry)
+        .collect();
     entries.sort_by_key(|entry| entry.name.to_ascii_lowercase());
     entries
 }
