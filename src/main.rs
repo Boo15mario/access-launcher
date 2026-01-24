@@ -2,10 +2,12 @@ use access_launcher::desktop::{build_category_map, collect_desktop_entries};
 use access_launcher::ui::{
     append_text_row, build_list_box, build_pane, show_error_dialog, update_program_list,
 };
+use futures_channel::oneshot;
 use gtk4::prelude::*;
-use gtk4::{self as gtk, gio, Application, ApplicationWindow, Orientation};
+use gtk4::{self as gtk, gio, glib, Application, ApplicationWindow, Orientation};
 use std::env;
 use std::rc::Rc;
+use std::thread;
 
 fn maybe_print_version() -> bool {
     for arg in env::args().skip(1) {
@@ -43,8 +45,6 @@ fn main() {
         .build();
 
     app.connect_activate(|app| {
-        let entries = Rc::new(collect_desktop_entries());
-        let category_map = Rc::new(build_category_map(&entries));
         let categories = [
             "Accessories",
             "Audio/Video",
@@ -66,23 +66,46 @@ fn main() {
         }
 
         let programs_list = build_list_box("Programs list");
-        update_program_list(&programs_list, &entries, &category_map, "Internet");
+        append_text_row(&programs_list, "Loading...", None);
 
-        {
-            let entries = Rc::clone(&entries);
-            let category_map = Rc::clone(&category_map);
-            let programs_list = programs_list.clone();
-            categories_list.connect_row_selected(move |_, row| {
-                if let Some(row) = row {
-                    if let Some(category) = unsafe { row.data::<String>("category") } {
-                        let category = unsafe { category.as_ref() };
-                        update_program_list(&programs_list, &entries, &category_map, category);
-                    }
+        let programs_list_clone = programs_list.clone();
+        let categories_list_clone = categories_list.clone();
+
+        let (sender, receiver) = oneshot::channel();
+
+        thread::spawn(move || {
+            let entries = collect_desktop_entries();
+            let category_map = build_category_map(&entries);
+            let _ = sender.send((entries, category_map));
+        });
+
+        let ctx = glib::MainContext::default();
+        ctx.spawn_local(async move {
+            if let Ok((entries, category_map)) = receiver.await {
+                let entries = Rc::new(entries);
+                let category_map = Rc::new(category_map);
+
+                update_program_list(&programs_list_clone, &entries, &category_map, "Internet");
+
+                {
+                    let entries = Rc::clone(&entries);
+                    let category_map = Rc::clone(&category_map);
+                    let programs_list = programs_list_clone.clone();
+                    categories_list_clone.connect_row_selected(move |_, row| {
+                        if let Some(row) = row {
+                            if let Some(category) = unsafe { row.data::<String>("category") } {
+                                let category = unsafe { category.as_ref() };
+                                update_program_list(&programs_list, &entries, &category_map, category);
+                            }
+                        }
+                    });
                 }
-            });
-        }
 
-        categories_list.select_row(categories_list.row_at_index(0).as_ref());
+                if let Some(row) = categories_list_clone.row_at_index(0) {
+                     categories_list_clone.select_row(Some(&row));
+                }
+            }
+        });
 
         let left_pane = build_pane("Categories", &categories_list);
         let right_pane = build_pane("Programs", &programs_list);
