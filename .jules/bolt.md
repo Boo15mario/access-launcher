@@ -1,0 +1,3 @@
+## 2026-01-25 - Sorting Optimization Surprise
+**Learning:** Allocation-free comparison (sort_unstable_by with char iteration) was SLOWER than allocating cached keys (sort_by_cached_key) because repeated case conversions (to_ascii_lowercase) on every comparison dominated the cost. Caching the transformed key is better when the comparison is cheap (String memcmp) and the transformation is expensive relative to allocation.
+**Action:** When optimizing sorting of strings with transformations (like case-insensitive), prefer caching the key if N > ~50. Measure before assuming zero-allocation is always faster.

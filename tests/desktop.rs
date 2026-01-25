@@ -87,8 +87,7 @@ Exec=app
 "#,
         "access-launcher-localized",
     );
-    let entry =
-        parse_desktop_entry(&file.path, Some("en_US.UTF-8"), None).expect("entry present");
+    let entry = parse_desktop_entry(&file.path, Some("en_US.UTF-8"), None).expect("entry present");
     assert_eq!(entry.name, "Localized Name");
 }
 
@@ -177,16 +176,16 @@ Name=Exec Source
 fn build_category_map_groups_and_sorts_entries() {
     let entries = vec![
         DesktopEntry {
-            name: "bApp".to_string(),
-            exec: "app".to_string(),
-            categories: vec!["Development".to_string()],
-            path: PathBuf::from("/tmp/bapp.desktop"),
-        },
-        DesktopEntry {
             name: "Aapp".to_string(),
             exec: "app".to_string(),
             categories: vec!["Development".to_string()],
             path: PathBuf::from("/tmp/aapp.desktop"),
+        },
+        DesktopEntry {
+            name: "bApp".to_string(),
+            exec: "app".to_string(),
+            categories: vec!["Development".to_string()],
+            path: PathBuf::from("/tmp/bapp.desktop"),
         },
         DesktopEntry {
             name: "GameApp".to_string(),
@@ -196,9 +195,7 @@ fn build_category_map_groups_and_sorts_entries() {
         },
     ];
     let map = build_category_map(&entries);
-    let dev_indices = map
-        .get("Development")
-        .expect("development category");
+    let dev_indices = map.get("Development").expect("development category");
     assert_eq!(entries[dev_indices[0]].name, "Aapp");
     assert_eq!(entries[dev_indices[1]].name, "bApp");
     assert!(map.contains_key("Games"));
