@@ -13,7 +13,8 @@ pub struct DesktopEntry {
 }
 
 fn push_unique(dirs: &mut Vec<PathBuf>, seen: &mut HashSet<PathBuf>, path: PathBuf) {
-    if seen.insert(path.clone()) {
+    if !seen.contains(&path) {
+        seen.insert(path.clone());
         dirs.push(path);
     }
 }
