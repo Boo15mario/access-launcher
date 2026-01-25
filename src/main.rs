@@ -91,14 +91,19 @@ fn main() {
                         if let Some(row) = row {
                             if let Some(category) = unsafe { row.data::<String>("category") } {
                                 let category = unsafe { category.as_ref() };
-                                update_program_list(&programs_list, &entries, &category_map, category);
+                                update_program_list(
+                                    &programs_list,
+                                    &entries,
+                                    &category_map,
+                                    category,
+                                );
                             }
                         }
                     });
                 }
 
                 if let Some(row) = categories_list_clone.row_at_index(0) {
-                     categories_list_clone.select_row(Some(&row));
+                    categories_list_clone.select_row(Some(&row));
                 }
             }
         });
