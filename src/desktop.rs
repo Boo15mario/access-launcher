@@ -98,9 +98,7 @@ fn desktop_dirs() -> Vec<PathBuf> {
             push_unique(
                 &mut dirs,
                 &mut seen,
-                PathBuf::from(format!(
-                    "/etc/profiles/per-user/{user}/share/applications"
-                )),
+                PathBuf::from(format!("/etc/profiles/per-user/{user}/share/applications")),
             );
         }
     }
@@ -348,7 +346,7 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
         .into_values()
         .map(|(entry, _)| entry)
         .collect();
-    entries.sort_by_key(|entry| entry.name.to_ascii_lowercase());
+    entries.sort_by_cached_key(|entry| entry.name.to_ascii_lowercase());
     entries
 }
 
@@ -356,9 +354,7 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
     let mut map: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     for (i, entry) in entries.iter().enumerate() {
         let bucket = map_categories(&entry.categories);
-        map.entry(bucket.to_string())
-            .or_default()
-            .push(i);
+        map.entry(bucket.to_string()).or_default().push(i);
     }
     for programs in map.values_mut() {
         programs.sort_by_key(|&i| entries[i].name.to_ascii_lowercase());
