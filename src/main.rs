@@ -9,17 +9,8 @@ use std::env;
 use std::rc::Rc;
 use std::thread;
 
-fn maybe_print_version() -> bool {
-    for arg in env::args().skip(1) {
-        if arg == "-v" || arg == "--version" {
-            println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
-            return true;
-        }
-    }
-    false
-}
-
-fn maybe_print_help() -> bool {
+fn check_args() -> bool {
+    let mut version_found = false;
     for arg in env::args().skip(1) {
         if arg == "-h" || arg == "--help" {
             println!(
@@ -28,15 +19,20 @@ fn maybe_print_help() -> bool {
             );
             return true;
         }
+        if arg == "-v" || arg == "--version" {
+            version_found = true;
+        }
+    }
+
+    if version_found {
+        println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+        return true;
     }
     false
 }
 
 fn main() {
-    if maybe_print_help() {
-        return;
-    }
-    if maybe_print_version() {
+    if check_args() {
         return;
     }
 
