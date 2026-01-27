@@ -2,6 +2,7 @@ use gtk4::glib;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::env;
 use std::fs;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug)]
@@ -130,10 +131,10 @@ fn walk_desktop_files(dir: &Path, files: &mut Vec<PathBuf>) {
 
         if file_type.is_dir() {
             walk_desktop_files(&path, files);
-        } else if file_type.is_file() || file_type.is_symlink() {
-            if path.extension().and_then(|ext| ext.to_str()) == Some("desktop") {
-                files.push(path);
-            }
+        } else if (file_type.is_file() || file_type.is_symlink())
+            && path.extension().and_then(|ext| ext.to_str()) == Some("desktop")
+        {
+            files.push(path);
         }
     }
 }
@@ -162,7 +163,10 @@ pub fn parse_desktop_entry(
     current_lang: Option<&str>,
     current_desktops: Option<&[String]>,
 ) -> Option<DesktopEntry> {
-    let contents = fs::read_to_string(path).ok()?;
+    let file = fs::File::open(path).ok()?;
+    let mut reader = BufReader::new(file);
+    let mut line_buf = String::new();
+
     let mut in_entry = false;
     let mut name: Option<String> = None;
     let mut localized_name: Option<String> = None;
@@ -174,8 +178,15 @@ pub fn parse_desktop_entry(
     let mut only_show_in: Option<Vec<String>> = None;
     let mut not_show_in: Option<Vec<String>> = None;
 
-    for raw_line in contents.lines() {
-        let line = raw_line.trim();
+    loop {
+        line_buf.clear();
+        match reader.read_line(&mut line_buf) {
+            Ok(0) => break,
+            Ok(_) => {}
+            Err(_) => break,
+        }
+
+        let line = line_buf.trim();
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
