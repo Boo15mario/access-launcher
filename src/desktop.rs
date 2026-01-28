@@ -332,6 +332,10 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
                 continue;
             }
 
+            if let Some((_, true)) = entries_by_id.get(&id) {
+                continue;
+            }
+
             if let Some(entry) =
                 parse_desktop_entry(&path, current_lang.as_deref(), current_desktops.as_deref())
             {
