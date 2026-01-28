@@ -173,8 +173,8 @@ Name=Exec Source
 }
 
 #[test]
-fn build_category_map_groups_and_sorts_entries() {
-    let entries = vec![
+fn build_category_map_groups_entries_preserving_order() {
+    let mut entries = vec![
         DesktopEntry {
             name: "bApp".to_string(),
             exec: "app".to_string(),
@@ -194,6 +194,9 @@ fn build_category_map_groups_and_sorts_entries() {
             path: PathBuf::from("/tmp/gameapp.desktop"),
         },
     ];
+    // Pre-sort the entries to match how collect_desktop_entries works.
+    entries.sort_by_cached_key(|entry| entry.name.to_ascii_lowercase());
+
     let map = build_category_map(&entries);
     let dev_indices = map.get("Development").expect("development category");
     assert_eq!(entries[dev_indices[0]].name, "Aapp");

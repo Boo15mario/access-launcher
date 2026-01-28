@@ -373,9 +373,6 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
         let bucket = map_categories(&entry.categories);
         map.entry(bucket.to_string()).or_default().push(i);
     }
-    for programs in map.values_mut() {
-        programs.sort_by_cached_key(|&i| entries[i].name.to_ascii_lowercase());
-    }
     map
 }
 
