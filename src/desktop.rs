@@ -292,6 +292,18 @@ pub fn exec_looks_valid(exec: &str) -> bool {
     if exec.is_empty() {
         return false;
     }
+
+    // Optimization: avoid glib parse/allocation for common cases.
+    // Most Exec lines are simple commands or absolute paths without quotes.
+    if !exec.contains(['"', '\'', '\\']) {
+        let command = exec.split_whitespace().next().unwrap_or("");
+        if command.starts_with('/') {
+            return Path::new(command).exists();
+        } else {
+            return true;
+        }
+    }
+
     let argv = match glib::shell_parse_argv(exec) {
         Ok(argv) => argv,
         Err(_) => return true,
