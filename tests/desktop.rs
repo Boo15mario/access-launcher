@@ -1,11 +1,14 @@
 use access_launcher::desktop::{
-    build_category_map, exec_looks_valid, matches_lang_tag, normalize_lang_tag, parse_bool,
-    parse_desktop_entry, DesktopEntry,
+    build_category_map, collect_desktop_entries, exec_looks_valid, matches_lang_tag,
+    normalize_lang_tag, parse_bool, parse_desktop_entry, DesktopEntry,
 };
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{atomic::{AtomicUsize, Ordering}, Mutex, MutexGuard};
+
+// Global lock to serialize tests that modify environment variables
+static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 struct TempFile {
     path: PathBuf,
@@ -231,3 +234,186 @@ fn build_category_map_groups_entries_preserving_order() {
     assert_eq!(entries[dev_indices[1]].name, "bApp");
     assert!(map.contains_key("Games"));
 }
+
+struct TempDir {
+    path: PathBuf,
+}
+
+impl TempDir {
+    fn new(suffix: &str) -> Self {
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let mut path = env::temp_dir();
+        let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let pid = std::process::id();
+        path.push(format!("access-launcher-testdir-{suffix}-{pid}-{id}"));
+        fs::create_dir_all(&path).expect("create temp dir");
+        Self { path }
+    }
+
+    fn write_desktop_file(&self, filename: &str, contents: &str) {
+        let file_path = self.path.join(filename);
+        fs::write(&file_path, contents).expect("write desktop file");
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.path);
+    }
+}
+
+#[test]
+fn collect_desktop_entries_skips_valid_duplicates() {
+    // Serialize access to environment variables
+    let _lock = ENV_LOCK.lock().unwrap();
+
+    // Create two directories with duplicate desktop files
+    let dir1 = TempDir::new("dir1");
+    let dir2 = TempDir::new("dir2");
+
+    // First directory has a valid entry
+    dir1.write_desktop_file(
+        "duplicate.desktop",
+        r#"
+[Desktop Entry]
+Type=Application
+Name=Valid Entry
+Exec=/bin/true
+Categories=Utility;
+"#,
+    );
+
+    // Second directory has another version (should be skipped)
+    dir2.write_desktop_file(
+        "duplicate.desktop",
+        r#"
+[Desktop Entry]
+Type=Application
+Name=Duplicate Entry
+Exec=/bin/false
+Categories=Development;
+"#,
+    );
+
+    // Set XDG_DATA_DIRS to our test directories
+    let old_data_dirs = env::var("XDG_DATA_DIRS").ok();
+    let test_dirs = format!("{}:{}", dir1.path.display(), dir2.path.display());
+    env::set_var("XDG_DATA_DIRS", &test_dirs);
+
+    // Also clear HOME and XDG_DATA_HOME to avoid interference
+    let old_home = env::var("HOME").ok();
+    let old_data_home = env::var("XDG_DATA_HOME").ok();
+    env::remove_var("HOME");
+    env::remove_var("XDG_DATA_HOME");
+
+    let entries = collect_desktop_entries();
+
+    // Restore environment
+    if let Some(val) = old_data_dirs {
+        env::set_var("XDG_DATA_DIRS", val);
+    } else {
+        env::remove_var("XDG_DATA_DIRS");
+    }
+    if let Some(val) = old_home {
+        env::set_var("HOME", val);
+    }
+    if let Some(val) = old_data_home {
+        env::set_var("XDG_DATA_HOME", val);
+    }
+
+    // Find the duplicate entry - use specific name matches to avoid false positives
+    let duplicate_entries: Vec<_> = entries
+        .iter()
+        .filter(|e| {
+            (e.name == "Valid Entry" || e.name == "Duplicate Entry")
+                && e.path.file_name().unwrap() == "duplicate.desktop"
+        })
+        .collect();
+
+    // Should only have one entry (the first valid one)
+    assert_eq!(
+        duplicate_entries.len(),
+        1,
+        "Expected exactly one duplicate.desktop entry, found {}",
+        duplicate_entries.len()
+    );
+    assert_eq!(duplicate_entries[0].name, "Valid Entry");
+}
+
+#[test]
+fn collect_desktop_entries_replaces_invalid_with_valid_duplicate() {
+    // Serialize access to environment variables
+    let _lock = ENV_LOCK.lock().unwrap();
+
+    // Create two directories with duplicate desktop files
+    let dir1 = TempDir::new("invalid");
+    let dir2 = TempDir::new("valid");
+
+    // First directory has an invalid entry (nonexistent executable)
+    dir1.write_desktop_file(
+        "test-app.desktop",
+        r#"
+[Desktop Entry]
+Type=Application
+Name=Invalid Entry
+Exec=/nonexistent/path/to/binary
+Categories=Utility;
+"#,
+    );
+
+    // Second directory has a valid entry
+    dir2.write_desktop_file(
+        "test-app.desktop",
+        r#"
+[Desktop Entry]
+Type=Application
+Name=Valid Entry
+Exec=/bin/true
+Categories=Utility;
+"#,
+    );
+
+    // Set XDG_DATA_DIRS to our test directories (dir1 first, then dir2)
+    let old_data_dirs = env::var("XDG_DATA_DIRS").ok();
+    let test_dirs = format!("{}:{}", dir1.path.display(), dir2.path.display());
+    env::set_var("XDG_DATA_DIRS", &test_dirs);
+
+    let old_home = env::var("HOME").ok();
+    let old_data_home = env::var("XDG_DATA_HOME").ok();
+    env::remove_var("HOME");
+    env::remove_var("XDG_DATA_HOME");
+
+    let entries = collect_desktop_entries();
+
+    // Restore environment
+    if let Some(val) = old_data_dirs {
+        env::set_var("XDG_DATA_DIRS", val);
+    } else {
+        env::remove_var("XDG_DATA_DIRS");
+    }
+    if let Some(val) = old_home {
+        env::set_var("HOME", val);
+    }
+    if let Some(val) = old_data_home {
+        env::set_var("XDG_DATA_HOME", val);
+    }
+
+    // Find test-app entries using specific checks
+    let test_entries: Vec<_> = entries
+        .iter()
+        .filter(|e| {
+            (e.name == "Valid Entry" || e.name == "Invalid Entry")
+                && e.path.file_name().unwrap() == "test-app.desktop"
+        })
+        .collect();
+
+    // Should have replaced invalid with valid
+    assert_eq!(
+        test_entries.len(),
+        1,
+        "Expected exactly one test-app.desktop entry"
+    );
+    assert_eq!(test_entries[0].name, "Valid Entry");
+    assert_eq!(test_entries[0].exec, "/bin/true");
+}
+
