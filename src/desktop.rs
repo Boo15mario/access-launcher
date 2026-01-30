@@ -335,35 +335,37 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
     let mut entries_by_id: HashMap<String, (DesktopEntry, bool)> = HashMap::new();
 
     for path in files {
-        let id = path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .map(|name| name.to_string());
-        if let Some(id) = id {
-            if id == "access-launcher.desktop" {
+        let id_str = match path.file_name().and_then(|name| name.to_str()) {
+            Some(name) => name,
+            None => continue,
+        };
+
+        if id_str == "access-launcher.desktop" {
+            continue;
+        }
+
+        if let Some((_, valid)) = entries_by_id.get(id_str) {
+            if *valid {
                 continue;
             }
+        }
 
-            if let Some((_, true)) = entries_by_id.get(&id) {
-                continue;
-            }
-
-            if let Some(entry) =
-                parse_desktop_entry(&path, current_lang.as_deref(), current_desktops.as_deref())
-            {
-                use std::collections::hash_map::Entry;
-                match entries_by_id.entry(id) {
-                    Entry::Vacant(vacant) => {
+        if let Some(entry) =
+            parse_desktop_entry(&path, current_lang.as_deref(), current_desktops.as_deref())
+        {
+            let id = id_str.to_string();
+            use std::collections::hash_map::Entry;
+            match entries_by_id.entry(id) {
+                Entry::Vacant(vacant) => {
+                    let new_valid = exec_looks_valid(&entry.exec);
+                    vacant.insert((entry, new_valid));
+                }
+                Entry::Occupied(mut occupied) => {
+                    let (_, existing_valid) = occupied.get();
+                    if !*existing_valid {
                         let new_valid = exec_looks_valid(&entry.exec);
-                        vacant.insert((entry, new_valid));
-                    }
-                    Entry::Occupied(mut occupied) => {
-                        let (_, existing_valid) = occupied.get();
-                        if !*existing_valid {
-                            let new_valid = exec_looks_valid(&entry.exec);
-                            if new_valid {
-                                occupied.insert((entry, new_valid));
-                            }
+                        if new_valid {
+                            occupied.insert((entry, new_valid));
                         }
                     }
                 }
