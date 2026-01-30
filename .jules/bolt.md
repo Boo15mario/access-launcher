@@ -9,3 +9,7 @@
 ## 2026-06-15 - Shell Argument Parsing Optimization
 **Learning:** `glib::shell_parse_argv` involves FFI and allocation which can be significant in a hot loop. For simple shell commands (no quotes, no escapes), manual string splitting and path checking is ~10x faster for relative commands and ~1.25x faster for absolute paths.
 **Action:** When validating shell commands in a loop, implement a fast path for unquoted strings to avoid FFI overhead.
+
+## 2026-06-25 - Shadowing Logic Optimization
+**Learning:** Checking for file existence (ID shadowing) before parsing is significantly faster than parsing and then checking validity. Correct XDG shadowing requires masking lower-priority files even if the high-priority file is hidden or invalid.
+**Action:** When implementing shadowing/overrides, use a `HashSet` of seen IDs to eagerly skip processing of lower-priority items.
