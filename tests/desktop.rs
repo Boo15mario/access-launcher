@@ -5,7 +5,10 @@ use access_launcher::desktop::{
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{atomic::{AtomicUsize, Ordering}, Mutex, MutexGuard};
+
+// Global lock to serialize tests that modify environment variables
+static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 struct TempFile {
     path: PathBuf,
@@ -230,6 +233,9 @@ impl Drop for TempDir {
 
 #[test]
 fn collect_desktop_entries_skips_valid_duplicates() {
+    // Serialize access to environment variables
+    let _lock = ENV_LOCK.lock().unwrap();
+
     // Create two directories with duplicate desktop files
     let dir1 = TempDir::new("dir1");
     let dir2 = TempDir::new("dir2");
@@ -284,10 +290,13 @@ Categories=Development;
         env::set_var("XDG_DATA_HOME", val);
     }
 
-    // Find the duplicate entry
+    // Find the duplicate entry - use specific name matches to avoid false positives
     let duplicate_entries: Vec<_> = entries
         .iter()
-        .filter(|e| e.name == "Valid Entry" || e.name == "Duplicate Entry")
+        .filter(|e| {
+            (e.name == "Valid Entry" || e.name == "Duplicate Entry")
+                && e.path.file_name().unwrap() == "duplicate.desktop"
+        })
         .collect();
 
     // Should only have one entry (the first valid one)
@@ -302,6 +311,9 @@ Categories=Development;
 
 #[test]
 fn collect_desktop_entries_replaces_invalid_with_valid_duplicate() {
+    // Serialize access to environment variables
+    let _lock = ENV_LOCK.lock().unwrap();
+
     // Create two directories with duplicate desktop files
     let dir1 = TempDir::new("invalid");
     let dir2 = TempDir::new("valid");
@@ -355,10 +367,13 @@ Categories=Utility;
         env::set_var("XDG_DATA_HOME", val);
     }
 
-    // Find test-app entries
+    // Find test-app entries using specific checks
     let test_entries: Vec<_> = entries
         .iter()
-        .filter(|e| e.name.contains("Entry") && e.path.file_name().unwrap() == "test-app.desktop")
+        .filter(|e| {
+            (e.name == "Valid Entry" || e.name == "Invalid Entry")
+                && e.path.file_name().unwrap() == "test-app.desktop"
+        })
         .collect();
 
     // Should have replaced invalid with valid
