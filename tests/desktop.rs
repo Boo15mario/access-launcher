@@ -173,19 +173,47 @@ Name=Exec Source
 }
 
 #[test]
-fn build_category_map_groups_and_sorts_entries() {
-    let entries = vec![
-        DesktopEntry {
-            name: "Aapp".to_string(),
-            exec: "app".to_string(),
-            categories: vec!["Development".to_string()],
-            path: PathBuf::from("/tmp/aapp.desktop"),
-        },
+fn exec_looks_valid_handles_complex_cases() {
+    let temp = TempFile::new("", "access-launcher-quoted");
+    let existing = temp.path.to_string_lossy().to_string();
+
+    // Quoted absolute path (existing)
+    let quoted_existing = format!("'{}'", existing);
+    assert!(exec_looks_valid(&quoted_existing));
+
+    // Quoted absolute path (missing)
+    let quoted_missing = "'/non/existent/path'";
+    assert!(!exec_looks_valid(quoted_missing));
+
+    // Quoted relative path
+    assert!(exec_looks_valid("'relative-command'"));
+
+    // Double quotes
+    let dquoted_existing = format!("\"{}\"", existing);
+    assert!(exec_looks_valid(&dquoted_existing));
+
+    // Complex args
+    let complex = format!("{} --arg='val'", existing);
+    assert!(exec_looks_valid(&complex));
+
+    // Env with args
+    assert!(exec_looks_valid("/usr/bin/env FOO=bar"));
+}
+
+#[test]
+fn build_category_map_groups_entries_preserving_order() {
+    let mut entries = vec![
         DesktopEntry {
             name: "bApp".to_string(),
             exec: "app".to_string(),
             categories: vec!["Development".to_string()],
             path: PathBuf::from("/tmp/bapp.desktop"),
+        },
+        DesktopEntry {
+            name: "Aapp".to_string(),
+            exec: "app".to_string(),
+            categories: vec!["Development".to_string()],
+            path: PathBuf::from("/tmp/aapp.desktop"),
         },
         DesktopEntry {
             name: "GameApp".to_string(),
@@ -194,6 +222,9 @@ fn build_category_map_groups_and_sorts_entries() {
             path: PathBuf::from("/tmp/gameapp.desktop"),
         },
     ];
+    // Pre-sort the entries to match how collect_desktop_entries works.
+    entries.sort_by_cached_key(|entry| entry.name.to_ascii_lowercase());
+
     let map = build_category_map(&entries);
     let dev_indices = map.get("Development").expect("development category");
     assert_eq!(entries[dev_indices[0]].name, "Aapp");
