@@ -1,5 +1,5 @@
 use gtk4::glib;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::env;
 use std::fs;
 use std::io::{BufRead, BufReader};
@@ -318,6 +318,22 @@ pub fn exec_looks_valid(exec: &str) -> bool {
     }
 }
 
+fn cmp_ignore_ascii_case(a: &str, b: &str) -> std::cmp::Ordering {
+    let a_bytes = a.as_bytes();
+    let b_bytes = b.as_bytes();
+    let len = a_bytes.len().min(b_bytes.len());
+
+    for i in 0..len {
+        let c1 = a_bytes[i].to_ascii_lowercase();
+        let c2 = b_bytes[i].to_ascii_lowercase();
+        match c1.cmp(&c2) {
+            std::cmp::Ordering::Equal => continue,
+            ord => return ord,
+        }
+    }
+    a_bytes.len().cmp(&b_bytes.len())
+}
+
 pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
     let mut files = Vec::new();
     for dir in desktop_dirs() {
@@ -332,7 +348,9 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
             .map(|entry| entry.to_string())
             .collect::<Vec<_>>()
     });
-    let mut entries_by_id: HashMap<String, (DesktopEntry, bool)> = HashMap::new();
+
+    let mut entries = Vec::new();
+    let mut seen_ids = HashSet::new();
 
     for path in files {
         let id_str = match path.file_name().and_then(|name| name.to_str()) {
@@ -344,40 +362,21 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
             continue;
         }
 
-        if let Some((_, valid)) = entries_by_id.get(id_str) {
-            if *valid {
-                continue;
-            }
+        if seen_ids.contains(id_str) {
+            continue;
         }
+        seen_ids.insert(id_str.to_string());
 
         if let Some(entry) =
             parse_desktop_entry(&path, current_lang.as_deref(), current_desktops.as_deref())
         {
-            let id = id_str.to_string();
-            use std::collections::hash_map::Entry;
-            match entries_by_id.entry(id) {
-                Entry::Vacant(vacant) => {
-                    let new_valid = exec_looks_valid(&entry.exec);
-                    vacant.insert((entry, new_valid));
-                }
-                Entry::Occupied(mut occupied) => {
-                    let (_, existing_valid) = occupied.get();
-                    if !*existing_valid {
-                        let new_valid = exec_looks_valid(&entry.exec);
-                        if new_valid {
-                            occupied.insert((entry, new_valid));
-                        }
-                    }
-                }
+            if exec_looks_valid(&entry.exec) {
+                entries.push(entry);
             }
         }
     }
 
-    let mut entries: Vec<DesktopEntry> = entries_by_id
-        .into_values()
-        .map(|(entry, _)| entry)
-        .collect();
-    entries.sort_by_cached_key(|entry| entry.name.to_ascii_lowercase());
+    entries.sort_by(|a, b| cmp_ignore_ascii_case(&a.name, &b.name));
     entries
 }
 
