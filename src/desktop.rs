@@ -175,8 +175,8 @@ pub fn parse_desktop_entry(
     let mut entry_type: Option<String> = None;
     let mut no_display = false;
     let mut hidden = false;
-    let mut only_show_in: Option<Vec<String>> = None;
-    let mut not_show_in: Option<Vec<String>> = None;
+    let mut only_show_in_raw: Option<String> = None;
+    let mut not_show_in_raw: Option<String> = None;
 
     loop {
         line_buf.clear();
@@ -214,8 +214,13 @@ pub fn parse_desktop_entry(
                 }
             }
         } else if key == "Exec" {
+            // Fail fast: Check exec validity immediately
+            if !exec_looks_valid(value) {
+                return None;
+            }
             exec = Some(value.to_string());
         } else if key == "Categories" {
+            // Eager parsing to avoid double allocation (raw string + vector parts)
             categories = value
                 .split(';')
                 .filter(|part| !part.is_empty())
@@ -228,19 +233,9 @@ pub fn parse_desktop_entry(
         } else if key == "Hidden" {
             hidden = parse_bool(value);
         } else if key == "OnlyShowIn" {
-            let values = value
-                .split(';')
-                .filter(|part| !part.is_empty())
-                .map(|part| part.to_string())
-                .collect::<Vec<_>>();
-            only_show_in = Some(values);
+            only_show_in_raw = Some(value.to_string());
         } else if key == "NotShowIn" {
-            let values = value
-                .split(';')
-                .filter(|part| !part.is_empty())
-                .map(|part| part.to_string())
-                .collect::<Vec<_>>();
-            not_show_in = Some(values);
+            not_show_in_raw = Some(value.to_string());
         }
     }
 
@@ -248,18 +243,21 @@ pub fn parse_desktop_entry(
         return None;
     }
 
+    // Lazy validation for OnlyShowIn/NotShowIn without allocating vectors
     if let Some(current_desktops) = current_desktops {
-        if let Some(only) = &only_show_in {
+        if let Some(only) = &only_show_in_raw {
             let matches = only
-                .iter()
+                .split(';')
+                .filter(|part| !part.is_empty())
                 .any(|item| current_desktops.iter().any(|c| c == item));
             if !matches {
                 return None;
             }
         }
-        if let Some(not) = &not_show_in {
+        if let Some(not) = &not_show_in_raw {
             let matches = not
-                .iter()
+                .split(';')
+                .filter(|part| !part.is_empty())
                 .any(|item| current_desktops.iter().any(|c| c == item));
             if matches {
                 return None;
@@ -267,13 +265,14 @@ pub fn parse_desktop_entry(
         }
     }
 
+    // Exec is required. If not found, return None.
+    let exec = exec?;
+
     let name = localized_name.or(name).or_else(|| {
         path.file_stem()
             .and_then(|stem| stem.to_str())
             .map(|stem| stem.to_string())
     })?;
-
-    let exec = exec.unwrap_or_default();
 
     if categories.is_empty() {
         categories.push("Other".to_string());
@@ -370,9 +369,8 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
         if let Some(entry) =
             parse_desktop_entry(&path, current_lang.as_deref(), current_desktops.as_deref())
         {
-            if exec_looks_valid(&entry.exec) {
-                entries.push(entry);
-            }
+            // exec_looks_valid is now checked inside parse_desktop_entry
+            entries.push(entry);
         }
     }
 
