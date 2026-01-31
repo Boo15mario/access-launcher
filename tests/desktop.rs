@@ -61,14 +61,14 @@ fn parse_desktop_entry_reads_core_fields() {
 [Desktop Entry]
 Type=Application
 Name=Sample App
-Exec=/usr/bin/sample --flag
+Exec=sample --flag
 Categories=Utility;Development;
 "#,
         "access-launcher-core",
     );
     let entry = parse_desktop_entry(&file.path, None, None).expect("entry present");
     assert_eq!(entry.name, "Sample App");
-    assert_eq!(entry.exec, "/usr/bin/sample --flag");
+    assert_eq!(entry.exec, "sample --flag");
     assert_eq!(
         entry.categories,
         vec!["Utility".to_string(), "Development".to_string()]

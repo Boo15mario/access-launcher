@@ -13,3 +13,7 @@
 ## 2026-06-25 - Shadowing Logic Optimization
 **Learning:** Checking for file existence (ID shadowing) before parsing is significantly faster than parsing and then checking validity. Correct XDG shadowing requires masking lower-priority files even if the high-priority file is hidden or invalid.
 **Action:** When implementing shadowing/overrides, use a `HashSet` of seen IDs to eagerly skip processing of lower-priority items.
+
+## 2026-06-26 - Lazy Parsing Trade-offs
+**Learning:** Delaying allocations for frequently present fields like `Categories` (Vec<String>) can be counter-productive due to the overhead of buffering the raw string (extra allocation/copy). However, for fields used primarily for filtering (like `OnlyShowIn`), storing the raw string and validating lazily avoids vector allocations entirely, which is a win.
+**Action:** Use lazy parsing/validation for optional filter fields, but parse required/common fields eagerly to avoid double-allocation penalties.
