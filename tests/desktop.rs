@@ -66,7 +66,8 @@ Categories=Utility;Development;
 "#,
         "access-launcher-core",
     );
-    let entry = parse_desktop_entry(&file.path, None, None).expect("entry present");
+    let mut buf = String::new();
+    let entry = parse_desktop_entry(&file.path, None, None, &mut buf).expect("entry present");
     assert_eq!(entry.name, "Sample App");
     assert_eq!(entry.exec, "sample --flag");
     assert_eq!(
@@ -87,7 +88,9 @@ Exec=app
 "#,
         "access-launcher-localized",
     );
-    let entry = parse_desktop_entry(&file.path, Some("en_US.UTF-8"), None).expect("entry present");
+    let mut buf = String::new();
+    let entry = parse_desktop_entry(&file.path, Some("en_US.UTF-8"), None, &mut buf)
+        .expect("entry present");
     assert_eq!(entry.name, "Localized Name");
 }
 
@@ -105,8 +108,9 @@ OnlyShowIn=GNOME;
     );
     let gnome = vec!["GNOME".to_string()];
     let kde = vec!["KDE".to_string()];
-    assert!(parse_desktop_entry(&file.path, None, Some(&gnome)).is_some());
-    assert!(parse_desktop_entry(&file.path, None, Some(&kde)).is_none());
+    let mut buf = String::new();
+    assert!(parse_desktop_entry(&file.path, None, Some(&gnome), &mut buf).is_some());
+    assert!(parse_desktop_entry(&file.path, None, Some(&kde), &mut buf).is_none());
 }
 
 #[test]
@@ -123,8 +127,9 @@ NotShowIn=GNOME;
     );
     let gnome = vec!["GNOME".to_string()];
     let kde = vec!["KDE".to_string()];
-    assert!(parse_desktop_entry(&file.path, None, Some(&kde)).is_some());
-    assert!(parse_desktop_entry(&file.path, None, Some(&gnome)).is_none());
+    let mut buf = String::new();
+    assert!(parse_desktop_entry(&file.path, None, Some(&kde), &mut buf).is_some());
+    assert!(parse_desktop_entry(&file.path, None, Some(&gnome), &mut buf).is_none());
 }
 
 #[test]
@@ -137,7 +142,8 @@ Exec=app
 "#,
         "access-launcher-fallback",
     );
-    let entry = parse_desktop_entry(&file.path, None, None).expect("entry present");
+    let mut buf = String::new();
+    let entry = parse_desktop_entry(&file.path, None, None, &mut buf).expect("entry present");
     let stem = file
         .path
         .file_stem()
