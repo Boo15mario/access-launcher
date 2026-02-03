@@ -116,7 +116,10 @@ fn desktop_dirs() -> Vec<PathBuf> {
     dirs
 }
 
-fn walk_desktop_files(dir: &Path, files: &mut Vec<PathBuf>) {
+fn walk_desktop_files<F>(dir: &Path, callback: &mut F)
+where
+    F: FnMut(PathBuf),
+{
     let entries = match fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(_) => return,
@@ -130,11 +133,11 @@ fn walk_desktop_files(dir: &Path, files: &mut Vec<PathBuf>) {
         };
 
         if file_type.is_dir() {
-            walk_desktop_files(&path, files);
+            walk_desktop_files(&path, callback);
         } else if (file_type.is_file() || file_type.is_symlink())
             && path.extension().and_then(|ext| ext.to_str()) == Some("desktop")
         {
-            files.push(path);
+            callback(path);
         }
     }
 }
@@ -162,10 +165,10 @@ pub fn parse_desktop_entry(
     path: &Path,
     current_lang: Option<&str>,
     current_desktops: Option<&[String]>,
+    buf: &mut String,
 ) -> Option<DesktopEntry> {
     let file = fs::File::open(path).ok()?;
     let mut reader = BufReader::new(file);
-    let mut line_buf = String::new();
 
     let mut in_entry = false;
     let mut name: Option<String> = None;
@@ -179,14 +182,14 @@ pub fn parse_desktop_entry(
     let mut not_show_in_raw: Option<String> = None;
 
     loop {
-        line_buf.clear();
-        match reader.read_line(&mut line_buf) {
+        buf.clear();
+        match reader.read_line(buf) {
             Ok(0) => break,
             Ok(_) => {}
             Err(_) => break,
         }
 
-        let line = line_buf.trim();
+        let line = buf.trim();
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
@@ -334,11 +337,6 @@ fn cmp_ignore_ascii_case(a: &str, b: &str) -> std::cmp::Ordering {
 }
 
 pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
-    let mut files = Vec::new();
-    for dir in desktop_dirs() {
-        walk_desktop_files(&dir, &mut files);
-    }
-
     let current_lang = env::var("LANG").ok();
     let current_desktops = env::var("XDG_CURRENT_DESKTOP").ok().map(|value| {
         value
@@ -350,28 +348,36 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
 
     let mut entries = Vec::new();
     let mut seen_ids = HashSet::new();
+    let mut buf = String::new();
 
-    for path in files {
+    let mut process_file = |path: PathBuf| {
         let id_str = match path.file_name().and_then(|name| name.to_str()) {
             Some(name) => name,
-            None => continue,
+            None => return,
         };
 
         if id_str == "access-launcher.desktop" {
-            continue;
+            return;
         }
 
         if seen_ids.contains(id_str) {
-            continue;
+            return;
         }
         seen_ids.insert(id_str.to_string());
 
-        if let Some(entry) =
-            parse_desktop_entry(&path, current_lang.as_deref(), current_desktops.as_deref())
-        {
+        if let Some(entry) = parse_desktop_entry(
+            &path,
+            current_lang.as_deref(),
+            current_desktops.as_deref(),
+            &mut buf,
+        ) {
             // exec_looks_valid is now checked inside parse_desktop_entry
             entries.push(entry);
         }
+    };
+
+    for dir in desktop_dirs() {
+        walk_desktop_files(&dir, &mut process_file);
     }
 
     entries.sort_by(|a, b| cmp_ignore_ascii_case(&a.name, &b.name));
