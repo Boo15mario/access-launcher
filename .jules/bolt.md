@@ -21,3 +21,11 @@
 ## 2026-06-27 - Map Key Allocation
 **Learning:** `BTreeMap::entry(key)` takes ownership of the key, forcing allocation if the key is `String`. Using `get_mut` with `&str` avoids this allocation for lookups.
 **Action:** When working with `BTreeMap<String, V>` (or `HashMap`), use `get_mut` or `get` with `&str` for lookups to avoid allocation, and only allocate when inserting.
+
+## 2026-07-15 - Zero-Allocation Parsing Loop
+**Learning:** For high-volume file parsing (like scanning hundreds of .desktop files), allocating a new `String` buffer for each file's `read_line` loop adds significant overhead. Passing a reusable mutable buffer from the caller eliminated these repeated allocations.
+**Action:** When parsing many files in a loop, lift the buffer allocation out of the parsing function and pass it as `&mut String`.
+
+## 2026-07-15 - Streamlined Directory Traversal
+**Learning:** Collecting all file paths into a `Vec<PathBuf>` before processing them consumes unnecessary memory and delays processing. Using a `FnMut` callback allows processing files immediately as they are discovered, improving cache locality and reducing peak memory usage.
+**Action:** Prefer callback-based traversal over collecting results into a vector when the consumer processes items sequentially.
