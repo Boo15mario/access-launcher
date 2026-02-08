@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 pub struct DesktopEntry {
     pub name: String,
     pub exec: String,
-    pub categories: Vec<String>,
+    pub categories: String,
     pub path: PathBuf,
 }
 
@@ -174,7 +174,7 @@ pub fn parse_desktop_entry(
     let mut name: Option<String> = None;
     let mut localized_name: Option<String> = None;
     let mut exec: Option<String> = None;
-    let mut categories: Vec<String> = Vec::new();
+    let mut categories: String = String::new();
     let mut entry_type: Option<String> = None;
     let mut no_display = false;
     let mut hidden = false;
@@ -223,12 +223,7 @@ pub fn parse_desktop_entry(
             }
             exec = Some(value.to_string());
         } else if key == "Categories" {
-            // Eager parsing to avoid double allocation (raw string + vector parts)
-            categories = value
-                .split(';')
-                .filter(|part| !part.is_empty())
-                .map(|part| part.to_string())
-                .collect();
+            categories = value.to_string();
         } else if key == "Type" {
             entry_type = Some(value.to_string());
         } else if key == "NoDisplay" {
@@ -276,10 +271,6 @@ pub fn parse_desktop_entry(
             .and_then(|stem| stem.to_str())
             .map(|stem| stem.to_string())
     })?;
-
-    if categories.is_empty() {
-        categories.push("Other".to_string());
-    }
 
     Some(DesktopEntry {
         name,
@@ -393,46 +384,39 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
     map
 }
 
-fn map_categories(categories: &[String]) -> &'static str {
-    let has = |needle: &str| categories.iter().any(|category| category == needle);
+fn map_categories(categories: &str) -> &'static str {
+    let mut best_priority = 13;
+    let mut best_category = "Other";
 
-    if has("TerminalEmulator") || has("Terminal") {
-        return "Terminal Emulator";
+    for category in categories.split(';') {
+        if category.is_empty() {
+            continue;
+        }
+        let (priority, name) = match category {
+            "TerminalEmulator" | "Terminal" => (1, "Terminal Emulator"),
+            "Network" | "WebBrowser" | "Internet" => (2, "Internet"),
+            "Game" | "Games" => (3, "Games"),
+            "Audio" | "AudioVideo" | "AudioVideoEditing" | "Video" | "VideoConference" => {
+                (4, "Audio/Video")
+            }
+            "Graphics" | "Photography" => (5, "Graphics"),
+            "Development" | "IDE" | "Programming" => (6, "Development"),
+            "Accessory" | "Accessories" => (7, "Accessories"),
+            "TextEditor" => (8, "Text Editors"),
+            "Office" => (9, "Office"),
+            "Utility" | "Utilities" => (10, "Utilities"),
+            "System" | "Settings" => (11, "System"),
+            _ => (12, "Other"),
+        };
+
+        if priority < best_priority {
+            best_priority = priority;
+            best_category = name;
+            // Terminal Emulator is the highest priority, so we can return early.
+            if best_priority == 1 {
+                return best_category;
+            }
+        }
     }
-    if has("Network") || has("WebBrowser") || has("Internet") {
-        return "Internet";
-    }
-    if has("Game") || has("Games") {
-        return "Games";
-    }
-    if has("Audio")
-        || has("AudioVideo")
-        || has("AudioVideoEditing")
-        || has("Video")
-        || has("VideoConference")
-    {
-        return "Audio/Video";
-    }
-    if has("Graphics") || has("Photography") {
-        return "Graphics";
-    }
-    if has("Development") || has("IDE") || has("Programming") {
-        return "Development";
-    }
-    if has("Accessory") || has("Accessories") {
-        return "Accessories";
-    }
-    if has("TextEditor") || has("TextEditor") {
-        return "Text Editors";
-    }
-    if has("Office") {
-        return "Office";
-    }
-    if has("Utility") || has("Utilities") {
-        return "Utilities";
-    }
-    if has("System") || has("Settings") {
-        return "System";
-    }
-    "Other"
+    best_category
 }
