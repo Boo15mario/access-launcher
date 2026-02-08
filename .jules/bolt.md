@@ -25,3 +25,7 @@
 ## 2026-07-15 - Streamlined Directory Traversal
 **Learning:** Collecting all file paths into a `Vec<PathBuf>` before processing them consumes unnecessary memory and delays processing. Using a `FnMut` callback allows processing files immediately as they are discovered, improving cache locality and reducing peak memory usage.
 **Action:** Prefer callback-based traversal over collecting results into a vector when the consumer processes items sequentially.
+
+## 2026-10-24 - Zero-Allocation Category Storage
+**Learning:** Storing `Categories` as `Vec<String>` caused eager allocation for every desktop entry, even though the data is only used once for categorization. Storing the raw string and parsing lazily avoids thousands of allocations.
+**Action:** For fields that are rarely accessed or only accessed once for processing, store the raw string representation and parse on demand.
