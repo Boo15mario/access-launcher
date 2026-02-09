@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 pub struct DesktopEntry {
     pub name: String,
     pub exec: String,
-    pub categories: Vec<String>,
+    pub categories: String,
     pub path: PathBuf,
 }
 
@@ -174,7 +174,7 @@ pub fn parse_desktop_entry(
     let mut name: Option<String> = None;
     let mut localized_name: Option<String> = None;
     let mut exec: Option<String> = None;
-    let mut categories: Vec<String> = Vec::new();
+    let mut categories = String::new();
     let mut entry_type: Option<String> = None;
     let mut no_display = false;
     let mut hidden = false;
@@ -223,12 +223,7 @@ pub fn parse_desktop_entry(
             }
             exec = Some(value.to_string());
         } else if key == "Categories" {
-            // Eager parsing to avoid double allocation (raw string + vector parts)
-            categories = value
-                .split(';')
-                .filter(|part| !part.is_empty())
-                .map(|part| part.to_string())
-                .collect();
+            categories = value.to_string();
         } else if key == "Type" {
             entry_type = Some(value.to_string());
         } else if key == "NoDisplay" {
@@ -276,10 +271,6 @@ pub fn parse_desktop_entry(
             .and_then(|stem| stem.to_str())
             .map(|stem| stem.to_string())
     })?;
-
-    if categories.is_empty() {
-        categories.push("Other".to_string());
-    }
 
     Some(DesktopEntry {
         name,
@@ -393,8 +384,8 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
     map
 }
 
-fn map_categories(categories: &[String]) -> &'static str {
-    let has = |needle: &str| categories.iter().any(|category| category == needle);
+fn map_categories(categories: &str) -> &'static str {
+    let has = |needle: &str| categories.split(';').any(|category| category == needle);
 
     if has("TerminalEmulator") || has("Terminal") {
         return "Terminal Emulator";
