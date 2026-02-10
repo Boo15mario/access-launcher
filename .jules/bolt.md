@@ -25,3 +25,7 @@
 ## 2026-07-15 - Streamlined Directory Traversal
 **Learning:** Collecting all file paths into a `Vec<PathBuf>` before processing them consumes unnecessary memory and delays processing. Using a `FnMut` callback allows processing files immediately as they are discovered, improving cache locality and reducing peak memory usage.
 **Action:** Prefer callback-based traversal over collecting results into a vector when the consumer processes items sequentially.
+
+## 2026-07-26 - Optimized Category Parsing
+**Learning:** Eagerly parsing optional list fields like `Categories` into `Vec<String>` causes excessive allocations (1 Vec + N Strings per entry), even for entries that are later discarded. Storing the raw semicolon-separated string avoids these allocations entirely, deferring parsing to the single usage point.
+**Action:** For string list fields in hot parsing loops, prefer storing the raw `String` and parsing lazily via iterator methods (`split`) if the data is consumed infrequently.
