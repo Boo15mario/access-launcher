@@ -72,7 +72,7 @@ Categories=Utility;Development;
     assert_eq!(entry.exec, "sample --flag");
     assert_eq!(
         entry.categories,
-        vec!["Utility".to_string(), "Development".to_string()]
+        "Utility;Development;"
     );
 }
 
@@ -150,7 +150,7 @@ Exec=app
         .and_then(|name| name.to_str())
         .expect("stem");
     assert_eq!(entry.name, stem);
-    assert_eq!(entry.categories, vec!["Other".to_string()]);
+    assert_eq!(entry.categories, "Other");
 }
 
 #[test]
@@ -212,19 +212,19 @@ fn build_category_map_groups_entries_preserving_order() {
         DesktopEntry {
             name: "bApp".to_string(),
             exec: "app".to_string(),
-            categories: vec!["Development".to_string()],
+            categories: "Development".to_string(),
             path: PathBuf::from("/tmp/bapp.desktop"),
         },
         DesktopEntry {
             name: "Aapp".to_string(),
             exec: "app".to_string(),
-            categories: vec!["Development".to_string()],
+            categories: "Development".to_string(),
             path: PathBuf::from("/tmp/aapp.desktop"),
         },
         DesktopEntry {
             name: "GameApp".to_string(),
             exec: "app".to_string(),
-            categories: vec!["Game".to_string()],
+            categories: "Game".to_string(),
             path: PathBuf::from("/tmp/gameapp.desktop"),
         },
     ];
