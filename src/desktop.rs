@@ -389,50 +389,75 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
 }
 
 fn map_categories(categories_raw: &str) -> &'static str {
-    let has = |needle: &str| {
-        categories_raw
-            .split(';')
-            .filter(|s| !s.is_empty())
-            .any(|category| category == needle)
-    };
+    let mut best_priority = usize::MAX;
+    let mut best_category = "Other";
 
-    if has("TerminalEmulator") || has("Terminal") {
-        return "Terminal Emulator";
+    for category in categories_raw.split(';') {
+        if category.is_empty() {
+            continue;
+        }
+
+        // Map categories to a (Priority, Group) tuple.
+        // Lower priority number means higher precedence.
+        // This mapping matches the original if-else chain order.
+        let (priority, result) = match category {
+            "TerminalEmulator" | "Terminal" => (1, "Terminal Emulator"),
+            "Network" | "WebBrowser" | "Internet" => (2, "Internet"),
+            "Game" | "Games" => (3, "Games"),
+            "Audio" | "AudioVideo" | "AudioVideoEditing" | "Video" | "VideoConference" => {
+                (4, "Audio/Video")
+            }
+            "Graphics" | "Photography" => (5, "Graphics"),
+            "Development" | "IDE" | "Programming" => (6, "Development"),
+            "Accessory" | "Accessories" => (7, "Accessories"),
+            "TextEditor" => (8, "Text Editors"),
+            "Office" => (9, "Office"),
+            "Utility" | "Utilities" => (10, "Utilities"),
+            "System" | "Settings" => (11, "System"),
+            _ => continue,
+        };
+
+        if priority < best_priority {
+            best_priority = priority;
+            best_category = result;
+            // Optimization: If we find the highest priority group, return immediately.
+            if best_priority == 1 {
+                return best_category;
+            }
+        }
     }
-    if has("Network") || has("WebBrowser") || has("Internet") {
-        return "Internet";
+
+    best_category
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_map_categories_priorities() {
+        // High priority check
+        assert_eq!(map_categories("TerminalEmulator"), "Terminal Emulator");
+        assert_eq!(map_categories("Terminal"), "Terminal Emulator");
+
+        // Priority precedence: Network (2) vs Game (3) -> Internet
+        assert_eq!(map_categories("Network;Game"), "Internet");
+        assert_eq!(map_categories("Game;Network"), "Internet");
+
+        // Other categories
+        assert_eq!(map_categories("Utility"), "Utilities");
+        assert_eq!(map_categories("Development"), "Development");
+
+        // Fallback
+        assert_eq!(map_categories("UnknownCategory"), "Other");
+        assert_eq!(map_categories(""), "Other");
+        assert_eq!(map_categories(";;;"), "Other");
+
+        // Combined checks
+        assert_eq!(map_categories("Office;TextEditor"), "Text Editors"); // TextEditor (8) < Office (9)
+        assert_eq!(map_categories("Utility;System"), "Utilities"); // Utility (10) < System (11)
+
+        // Single best match
+        assert_eq!(map_categories("Graphics;Unknown"), "Graphics");
     }
-    if has("Game") || has("Games") {
-        return "Games";
-    }
-    if has("Audio")
-        || has("AudioVideo")
-        || has("AudioVideoEditing")
-        || has("Video")
-        || has("VideoConference")
-    {
-        return "Audio/Video";
-    }
-    if has("Graphics") || has("Photography") {
-        return "Graphics";
-    }
-    if has("Development") || has("IDE") || has("Programming") {
-        return "Development";
-    }
-    if has("Accessory") || has("Accessories") {
-        return "Accessories";
-    }
-    if has("TextEditor") || has("TextEditor") {
-        return "Text Editors";
-    }
-    if has("Office") {
-        return "Office";
-    }
-    if has("Utility") || has("Utilities") {
-        return "Utilities";
-    }
-    if has("System") || has("Settings") {
-        return "System";
-    }
-    "Other"
 }
