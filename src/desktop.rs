@@ -383,56 +383,44 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
     let mut map: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     for (i, entry) in entries.iter().enumerate() {
         let bucket = map_categories(&entry.categories);
-        map.entry(bucket.to_string()).or_default().push(i);
+        if let Some(list) = map.get_mut(bucket) {
+            list.push(i);
+        } else {
+            map.insert(bucket.to_string(), vec![i]);
+        }
     }
     map
 }
 
 fn map_categories(categories_raw: &str) -> &'static str {
-    let has = |needle: &str| {
-        categories_raw
-            .split(';')
-            .filter(|s| !s.is_empty())
-            .any(|category| category == needle)
-    };
+    let mut best_priority = 100;
+    let mut best_category = "Other";
 
-    if has("TerminalEmulator") || has("Terminal") {
-        return "Terminal Emulator";
+    for category in categories_raw.split(';') {
+        let (priority, group) = match category {
+            "TerminalEmulator" | "Terminal" => (1, "Terminal Emulator"),
+            "Network" | "WebBrowser" | "Internet" => (2, "Internet"),
+            "Game" | "Games" => (3, "Games"),
+            "Audio" | "AudioVideo" | "AudioVideoEditing" | "Video" | "VideoConference" => {
+                (4, "Audio/Video")
+            }
+            "Graphics" | "Photography" => (5, "Graphics"),
+            "Development" | "IDE" | "Programming" => (6, "Development"),
+            "Accessory" | "Accessories" => (7, "Accessories"),
+            "TextEditor" => (8, "Text Editors"),
+            "Office" => (9, "Office"),
+            "Utility" | "Utilities" => (10, "Utilities"),
+            "System" | "Settings" => (11, "System"),
+            _ => continue,
+        };
+
+        if priority < best_priority {
+            best_priority = priority;
+            best_category = group;
+            if best_priority == 1 {
+                break;
+            }
+        }
     }
-    if has("Network") || has("WebBrowser") || has("Internet") {
-        return "Internet";
-    }
-    if has("Game") || has("Games") {
-        return "Games";
-    }
-    if has("Audio")
-        || has("AudioVideo")
-        || has("AudioVideoEditing")
-        || has("Video")
-        || has("VideoConference")
-    {
-        return "Audio/Video";
-    }
-    if has("Graphics") || has("Photography") {
-        return "Graphics";
-    }
-    if has("Development") || has("IDE") || has("Programming") {
-        return "Development";
-    }
-    if has("Accessory") || has("Accessories") {
-        return "Accessories";
-    }
-    if has("TextEditor") || has("TextEditor") {
-        return "Text Editors";
-    }
-    if has("Office") {
-        return "Office";
-    }
-    if has("Utility") || has("Utilities") {
-        return "Utilities";
-    }
-    if has("System") || has("Settings") {
-        return "System";
-    }
-    "Other"
+    best_category
 }

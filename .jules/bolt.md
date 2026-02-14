@@ -29,3 +29,11 @@
 ## 2026-02-04 - Raw String Storage for Categories
 **Learning:** Storing list-like fields (e.g., `Categories`) as `Vec<String>` in high-cardinality structs causes significant allocation overhead (N+1 allocations per entry). Storing the raw delimited string and parsing it lazily via iterators reduced allocations by ~75% for that field and improved parsing throughput by ~6%.
 **Action:** For fields that are parsed eagerly but accessed infrequently or read-only, store the raw string data and use iterator-based accessors instead of eagerly collecting into a Vector.
+
+## 2026-05-23 - Single-Pass Category Mapping
+**Learning:** Iterating through a delimited string multiple times to check for category group membership is inefficient (O(M*N)). Replacing it with a single-pass iterator that maps each token to a priority group improved category mapping performance by ~3.8x.
+**Action:** When mapping a set of tokens to a single output based on priority, use a single pass to find the best match instead of multiple scans.
+
+## 2026-05-23 - Zero-Allocation Map Lookup
+**Learning:** Using `map.entry(key.to_string())` allocates a new `String` even if the key exists. Checking for existence with `map.get_mut(key_str)` avoids allocation in the common case, improving performance by another ~1.3x.
+**Action:** When using `BTreeMap<String, V>` with string slice keys, prefer `get_mut` for updates to avoid allocation, falling back to `insert` only when necessary.
