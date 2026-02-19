@@ -29,3 +29,7 @@
 ## 2026-02-04 - Raw String Storage for Categories
 **Learning:** Storing list-like fields (e.g., `Categories`) as `Vec<String>` in high-cardinality structs causes significant allocation overhead (N+1 allocations per entry). Storing the raw delimited string and parsing it lazily via iterators reduced allocations by ~75% for that field and improved parsing throughput by ~6%.
 **Action:** For fields that are parsed eagerly but accessed infrequently or read-only, store the raw string data and use iterator-based accessors instead of eagerly collecting into a Vector.
+
+## 2026-10-25 - Single-Pass Category Mapping
+**Learning:** `map_categories` was iterating over the split category string multiple times (once for each category group check), leading to O(M*N) complexity. Replacing this with a single pass over the split string and mapping each category to a (priority, group) tuple reduced complexity to O(N).
+**Action:** When matching a list of items against multiple groups with precedence, iterate over the items once and maintain the "best" match found so far based on priority.
