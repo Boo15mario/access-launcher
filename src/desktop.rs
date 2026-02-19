@@ -389,50 +389,66 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
 }
 
 fn map_categories(categories_raw: &str) -> &'static str {
-    let has = |needle: &str| {
-        categories_raw
-            .split(';')
-            .filter(|s| !s.is_empty())
-            .any(|category| category == needle)
-    };
+    let mut best_priority = usize::MAX;
+    let mut best_group = "Other";
 
-    if has("TerminalEmulator") || has("Terminal") {
-        return "Terminal Emulator";
+    for category in categories_raw.split(';') {
+        if category.is_empty() {
+            continue;
+        }
+
+        let (priority, group) = match category {
+            "TerminalEmulator" | "Terminal" => (1, "Terminal Emulator"),
+            "Network" | "WebBrowser" | "Internet" => (2, "Internet"),
+            "Game" | "Games" => (3, "Games"),
+            "Audio" | "AudioVideo" | "AudioVideoEditing" | "Video" | "VideoConference" => {
+                (4, "Audio/Video")
+            }
+            "Graphics" | "Photography" => (5, "Graphics"),
+            "Development" | "IDE" | "Programming" => (6, "Development"),
+            "Accessory" | "Accessories" => (7, "Accessories"),
+            "TextEditor" => (8, "Text Editors"),
+            "Office" => (9, "Office"),
+            "Utility" | "Utilities" => (10, "Utilities"),
+            "System" | "Settings" => (11, "System"),
+            _ => continue,
+        };
+
+        if priority < best_priority {
+            best_priority = priority;
+            best_group = group;
+            if best_priority == 1 {
+                return best_group;
+            }
+        }
     }
-    if has("Network") || has("WebBrowser") || has("Internet") {
-        return "Internet";
+
+    best_group
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_map_categories_precedence() {
+        assert_eq!(map_categories("Utility;TextEditor;"), "Text Editors"); // TextEditor (8) vs Utility (10)
+        assert_eq!(map_categories("Network;WebBrowser;"), "Internet");
+        assert_eq!(map_categories("Game;"), "Games");
+        assert_eq!(map_categories("AudioVideo;Player;"), "Audio/Video");
+        assert_eq!(map_categories("Development;IDE;"), "Development");
+        assert_eq!(map_categories("Office;Spreadsheet;"), "Office");
+        assert_eq!(map_categories("System;Settings;"), "System");
+        assert_eq!(map_categories("Unknown;Category;"), "Other");
+
+        // Priority checks
+        assert_eq!(map_categories("Utility;Network;"), "Internet"); // Network (2) < Utility (10)
+        assert_eq!(map_categories("Terminal;Network;"), "Terminal Emulator"); // Terminal (1) < Network (2)
+        assert_eq!(map_categories("System;Game;"), "Games"); // Game (3) < System (11)
+        assert_eq!(map_categories("Graphics;Audio;"), "Audio/Video"); // Audio (4) < Graphics (5)
+
+        // Edge cases
+        assert_eq!(map_categories(""), "Other");
+        assert_eq!(map_categories(";;;"), "Other");
     }
-    if has("Game") || has("Games") {
-        return "Games";
-    }
-    if has("Audio")
-        || has("AudioVideo")
-        || has("AudioVideoEditing")
-        || has("Video")
-        || has("VideoConference")
-    {
-        return "Audio/Video";
-    }
-    if has("Graphics") || has("Photography") {
-        return "Graphics";
-    }
-    if has("Development") || has("IDE") || has("Programming") {
-        return "Development";
-    }
-    if has("Accessory") || has("Accessories") {
-        return "Accessories";
-    }
-    if has("TextEditor") || has("TextEditor") {
-        return "Text Editors";
-    }
-    if has("Office") {
-        return "Office";
-    }
-    if has("Utility") || has("Utilities") {
-        return "Utilities";
-    }
-    if has("System") || has("Settings") {
-        return "System";
-    }
-    "Other"
 }
