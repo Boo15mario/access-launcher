@@ -234,3 +234,40 @@ fn build_category_map_groups_entries_preserving_order() {
     assert_eq!(entries[dev_indices[1]].name, "bApp");
     assert!(map.contains_key("Games"));
 }
+
+#[test]
+fn build_category_map_respects_precedence() {
+    let entries = vec![
+        DesktopEntry {
+            name: "App1".to_string(),
+            exec: "app".to_string(),
+            categories: "System;TerminalEmulator;".to_string(),
+            path: PathBuf::from("/tmp/app1.desktop"),
+        },
+        DesktopEntry {
+            name: "App2".to_string(),
+            exec: "app".to_string(),
+            categories: "Game;Internet;".to_string(),
+            path: PathBuf::from("/tmp/app2.desktop"),
+        },
+        DesktopEntry {
+            name: "App3".to_string(),
+            exec: "app".to_string(),
+            categories: "Unknown;Utility;".to_string(),
+            path: PathBuf::from("/tmp/app3.desktop"),
+        },
+    ];
+
+    let map = build_category_map(&entries);
+
+    // TerminalEmulator (1) > System (11)
+    assert!(map.contains_key("Terminal Emulator"));
+    assert!(!map.contains_key("System"));
+
+    // Internet (2) > Game (3)
+    assert!(map.contains_key("Internet"));
+    assert!(!map.contains_key("Games"));
+
+    // Utility (10) > Unknown (ignored)
+    assert!(map.contains_key("Utilities"));
+}
