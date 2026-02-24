@@ -30,6 +30,6 @@
 **Learning:** Collecting all file paths into a `Vec<PathBuf>` before processing them consumes unnecessary memory and delays processing. Using a `FnMut` callback allows processing files immediately as they are discovered, improving cache locality and reducing peak memory usage.
 **Action:** Prefer callback-based traversal over collecting results into a vector when the consumer processes items sequentially.
 
-## 2026-08-16 - Deferred I/O Validation
-**Learning:** Eagerly validating file paths (e.g. `Exec` key) inside a parsing loop triggers expensive syscalls even for entries that will be discarded later (e.g. `NoDisplay=true`). Deferring validation until after visibility filtering saved ~38% parsing time in benchmarks.
-**Action:** When parsing records with optional expensive validation steps, perform cheap filtering first and validate only the survivors.
+## 2026-10-24 - Zero-Allocation Category Storage
+**Learning:** Storing `Categories` as `Vec<String>` caused eager allocation for every desktop entry, even though the data is only used once for categorization. Storing the raw string and parsing lazily avoids thousands of allocations.
+**Action:** For fields that are rarely accessed or only accessed once for processing, store the raw string representation and parse on demand.
