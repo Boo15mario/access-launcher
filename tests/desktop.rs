@@ -66,11 +66,14 @@ Categories=Utility;Development;
 "#,
         "access-launcher-core",
     );
-    let mut buf = String::new();
-    let entry = parse_desktop_entry(&file.path, None, None, &mut buf).expect("entry present");
+    let mut line_buf = String::new();
+    let entry = parse_desktop_entry(&file.path, None, None, &mut line_buf).expect("entry present");
     assert_eq!(entry.name, "Sample App");
     assert_eq!(entry.exec, "sample --flag");
-    assert_eq!(entry.categories, "Utility;Development;");
+    assert_eq!(
+        entry.categories,
+        "Utility;Development;"
+    );
 }
 
 #[test]
@@ -85,9 +88,8 @@ Exec=app
 "#,
         "access-launcher-localized",
     );
-    let mut buf = String::new();
-    let entry = parse_desktop_entry(&file.path, Some("en_US.UTF-8"), None, &mut buf)
-        .expect("entry present");
+    let mut line_buf = String::new();
+    let entry = parse_desktop_entry(&file.path, Some("en_US.UTF-8"), None, &mut line_buf).expect("entry present");
     assert_eq!(entry.name, "Localized Name");
 }
 
@@ -105,9 +107,9 @@ OnlyShowIn=GNOME;
     );
     let gnome = vec!["GNOME".to_string()];
     let kde = vec!["KDE".to_string()];
-    let mut buf = String::new();
-    assert!(parse_desktop_entry(&file.path, None, Some(&gnome), &mut buf).is_some());
-    assert!(parse_desktop_entry(&file.path, None, Some(&kde), &mut buf).is_none());
+    let mut line_buf = String::new();
+    assert!(parse_desktop_entry(&file.path, None, Some(&gnome), &mut line_buf).is_some());
+    assert!(parse_desktop_entry(&file.path, None, Some(&kde), &mut line_buf).is_none());
 }
 
 #[test]
@@ -124,9 +126,9 @@ NotShowIn=GNOME;
     );
     let gnome = vec!["GNOME".to_string()];
     let kde = vec!["KDE".to_string()];
-    let mut buf = String::new();
-    assert!(parse_desktop_entry(&file.path, None, Some(&kde), &mut buf).is_some());
-    assert!(parse_desktop_entry(&file.path, None, Some(&gnome), &mut buf).is_none());
+    let mut line_buf = String::new();
+    assert!(parse_desktop_entry(&file.path, None, Some(&kde), &mut line_buf).is_some());
+    assert!(parse_desktop_entry(&file.path, None, Some(&gnome), &mut line_buf).is_none());
 }
 
 #[test]
@@ -139,15 +141,16 @@ Exec=app
 "#,
         "access-launcher-fallback",
     );
-    let mut buf = String::new();
-    let entry = parse_desktop_entry(&file.path, None, None, &mut buf).expect("entry present");
+    let mut line_buf = String::new();
+    let entry = parse_desktop_entry(&file.path, None, None, &mut line_buf).expect("entry present");
     let stem = file
         .path
         .file_stem()
         .and_then(|name| name.to_str())
         .expect("stem");
     assert_eq!(entry.name, stem);
-    assert_eq!(entry.categories, "Other");
+    // Categories should be empty string if missing from file
+    assert_eq!(entry.categories, "");
 }
 
 #[test]
@@ -233,4 +236,41 @@ fn build_category_map_groups_entries_preserving_order() {
     assert_eq!(entries[dev_indices[0]].name, "Aapp");
     assert_eq!(entries[dev_indices[1]].name, "bApp");
     assert!(map.contains_key("Games"));
+}
+
+#[test]
+fn build_category_map_respects_precedence() {
+    let entries = vec![
+        DesktopEntry {
+            name: "App1".to_string(),
+            exec: "app".to_string(),
+            categories: "System;TerminalEmulator;".to_string(),
+            path: PathBuf::from("/tmp/app1.desktop"),
+        },
+        DesktopEntry {
+            name: "App2".to_string(),
+            exec: "app".to_string(),
+            categories: "Game;Internet;".to_string(),
+            path: PathBuf::from("/tmp/app2.desktop"),
+        },
+        DesktopEntry {
+            name: "App3".to_string(),
+            exec: "app".to_string(),
+            categories: "Unknown;Utility;".to_string(),
+            path: PathBuf::from("/tmp/app3.desktop"),
+        },
+    ];
+
+    let map = build_category_map(&entries);
+
+    // TerminalEmulator (1) > System (11)
+    assert!(map.contains_key("Terminal Emulator"));
+    assert!(!map.contains_key("System"));
+
+    // Internet (2) > Game (3)
+    assert!(map.contains_key("Internet"));
+    assert!(!map.contains_key("Games"));
+
+    // Utility (10) > Unknown (ignored)
+    assert!(map.contains_key("Utilities"));
 }
