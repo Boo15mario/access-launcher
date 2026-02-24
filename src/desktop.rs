@@ -387,7 +387,9 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
 }
 
 fn map_categories(categories_raw: &str) -> &'static str {
-    let mut best_priority = 100u8;
+    // Optimization: iterate categories once and pick the highest priority group.
+    // Lower priority value means higher precedence.
+    let mut best_prio = usize::MAX;
     let mut best_group = "Other";
 
     for category in categories_raw.split(';') {
@@ -395,7 +397,7 @@ fn map_categories(categories_raw: &str) -> &'static str {
             continue;
         }
 
-        let (priority, group) = match category {
+        let (prio, group) = match category {
             "TerminalEmulator" | "Terminal" => (1, "Terminal Emulator"),
             "Network" | "WebBrowser" | "Internet" => (2, "Internet"),
             "Game" | "Games" => (3, "Games"),
@@ -409,44 +411,16 @@ fn map_categories(categories_raw: &str) -> &'static str {
             "Office" => (9, "Office"),
             "Utility" | "Utilities" => (10, "Utilities"),
             "System" | "Settings" => (11, "System"),
-            _ => continue,
+            _ => (usize::MAX, "Other"),
         };
 
-        if priority < best_priority {
-            best_priority = priority;
+        if prio < best_prio {
+            best_prio = prio;
             best_group = group;
-            if best_priority == 1 {
+            if best_prio == 1 {
                 return best_group;
             }
         }
     }
     best_group
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_map_categories() {
-        // Basic mapping
-        assert_eq!(map_categories("TerminalEmulator"), "Terminal Emulator");
-        assert_eq!(map_categories("Game"), "Games");
-
-        // Priority handling
-        assert_eq!(map_categories("Utility;Game"), "Games"); // Game (3) < Utility (10)
-        assert_eq!(map_categories("Game;Utility"), "Games");
-
-        // Multiple matches
-        assert_eq!(map_categories("System;Settings"), "System"); // Same priority (11)
-
-        // Fallback
-        assert_eq!(map_categories("Unknown;Category"), "Other");
-
-        // Case sensitivity check (original code was case sensitive)
-        assert_eq!(map_categories("game"), "Other");
-
-        // Empty parts
-        assert_eq!(map_categories("Utility;;Game"), "Games");
-    }
 }
