@@ -216,7 +216,7 @@ pub fn parse_desktop_entry(
         } else if key == "Exec" {
             exec = Some(value.to_string());
         } else if key == "Categories" {
-            // Optimization: Store raw string to avoid allocating Vec and multiple Strings
+            // Store raw string to avoid vector allocation
             categories = value.to_string();
         } else if key == "Type" {
             entry_type = Some(value.to_string());
