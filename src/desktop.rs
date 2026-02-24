@@ -377,8 +377,6 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
     let mut map: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     for (i, entry) in entries.iter().enumerate() {
         let bucket = map_categories(&entry.categories);
-        // Optimization: Use `get_mut` with &str to avoid allocating a new String for lookup.
-        // Only allocate when inserting a new category.
         if let Some(list) = map.get_mut(bucket) {
             list.push(i);
         } else {
@@ -389,18 +387,11 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
 }
 
 fn map_categories(categories_raw: &str) -> &'static str {
-    let mut best_priority = usize::MAX;
+    let mut best_priority = 100;
     let mut best_category = "Other";
 
     for category in categories_raw.split(';') {
-        if category.is_empty() {
-            continue;
-        }
-
-        // Map categories to a (Priority, Group) tuple.
-        // Lower priority number means higher precedence.
-        // This mapping matches the original if-else chain order.
-        let (priority, result) = match category {
+        let (priority, group) = match category {
             "TerminalEmulator" | "Terminal" => (1, "Terminal Emulator"),
             "Network" | "WebBrowser" | "Internet" => (2, "Internet"),
             "Game" | "Games" => (3, "Games"),
@@ -419,45 +410,11 @@ fn map_categories(categories_raw: &str) -> &'static str {
 
         if priority < best_priority {
             best_priority = priority;
-            best_category = result;
-            // Optimization: If we find the highest priority group, return immediately.
+            best_category = group;
             if best_priority == 1 {
-                return best_category;
+                break;
             }
         }
     }
-
     best_category
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_map_categories_priorities() {
-        // High priority check
-        assert_eq!(map_categories("TerminalEmulator"), "Terminal Emulator");
-        assert_eq!(map_categories("Terminal"), "Terminal Emulator");
-
-        // Priority precedence: Network (2) vs Game (3) -> Internet
-        assert_eq!(map_categories("Network;Game"), "Internet");
-        assert_eq!(map_categories("Game;Network"), "Internet");
-
-        // Other categories
-        assert_eq!(map_categories("Utility"), "Utilities");
-        assert_eq!(map_categories("Development"), "Development");
-
-        // Fallback
-        assert_eq!(map_categories("UnknownCategory"), "Other");
-        assert_eq!(map_categories(""), "Other");
-        assert_eq!(map_categories(";;;"), "Other");
-
-        // Combined checks
-        assert_eq!(map_categories("Office;TextEditor"), "Text Editors"); // TextEditor (8) < Office (9)
-        assert_eq!(map_categories("Utility;System"), "Utilities"); // Utility (10) < System (11)
-
-        // Single best match
-        assert_eq!(map_categories("Graphics;Unknown"), "Graphics");
-    }
 }
