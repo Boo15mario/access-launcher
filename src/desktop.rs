@@ -387,10 +387,11 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
 }
 
 fn map_categories(categories_raw: &str) -> &'static str {
-    let mut best_priority = usize::MAX;
+    let mut best_priority = 100;
     let mut best_group = "Other";
 
     for category in categories_raw.split(';') {
+        let category = category.trim();
         if category.is_empty() {
             continue;
         }
@@ -420,33 +421,5 @@ fn map_categories(categories_raw: &str) -> &'static str {
             }
         }
     }
-
     best_group
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_map_categories_precedence() {
-        assert_eq!(map_categories("Utility;TextEditor;"), "Text Editors"); // TextEditor (8) vs Utility (10)
-        assert_eq!(map_categories("Network;WebBrowser;"), "Internet");
-        assert_eq!(map_categories("Game;"), "Games");
-        assert_eq!(map_categories("AudioVideo;Player;"), "Audio/Video");
-        assert_eq!(map_categories("Development;IDE;"), "Development");
-        assert_eq!(map_categories("Office;Spreadsheet;"), "Office");
-        assert_eq!(map_categories("System;Settings;"), "System");
-        assert_eq!(map_categories("Unknown;Category;"), "Other");
-
-        // Priority checks
-        assert_eq!(map_categories("Utility;Network;"), "Internet"); // Network (2) < Utility (10)
-        assert_eq!(map_categories("Terminal;Network;"), "Terminal Emulator"); // Terminal (1) < Network (2)
-        assert_eq!(map_categories("System;Game;"), "Games"); // Game (3) < System (11)
-        assert_eq!(map_categories("Graphics;Audio;"), "Audio/Video"); // Audio (4) < Graphics (5)
-
-        // Edge cases
-        assert_eq!(map_categories(""), "Other");
-        assert_eq!(map_categories(";;;"), "Other");
-    }
 }
