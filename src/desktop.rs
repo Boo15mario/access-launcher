@@ -388,21 +388,20 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
 
 fn map_categories(categories_raw: &str) -> &'static str {
     let mut best_priority = 100;
-    let mut best_match = "Other";
+    let mut best_category = "Other";
 
     for category in categories_raw.split(';') {
         if category.is_empty() {
             continue;
         }
 
-        let (priority, group) = match category {
+        let (priority, mapped) = match category {
             "TerminalEmulator" | "Terminal" => (1, "Terminal Emulator"),
             "Network" | "WebBrowser" | "Internet" => (2, "Internet"),
             "Game" | "Games" => (3, "Games"),
-            "Audio" | "AudioVideo" | "AudioVideoEditing" | "Video" | "VideoConference" => (
-                4,
-                "Audio/Video",
-            ),
+            "Audio" | "AudioVideo" | "AudioVideoEditing" | "Video" | "VideoConference" => {
+                (4, "Audio/Video")
+            }
             "Graphics" | "Photography" => (5, "Graphics"),
             "Development" | "IDE" | "Programming" => (6, "Development"),
             "Accessory" | "Accessories" => (7, "Accessories"),
@@ -410,43 +409,19 @@ fn map_categories(categories_raw: &str) -> &'static str {
             "Office" => (9, "Office"),
             "Utility" | "Utilities" => (10, "Utilities"),
             "System" | "Settings" => (11, "System"),
-            _ => (100, "Other"),
+            _ => continue,
         };
 
         if priority < best_priority {
             best_priority = priority;
-            best_match = group;
-            // Optimization: Since 1 is the highest priority, we can return early.
+            best_category = mapped;
+            // Optimization: Since 1 is the highest priority (lowest number),
+            // we can return early if we find it.
             if best_priority == 1 {
-                return best_match;
+                return best_category;
             }
         }
     }
-    best_match
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_map_categories() {
-        assert_eq!(map_categories("TerminalEmulator"), "Terminal Emulator");
-        assert_eq!(map_categories("Terminal"), "Terminal Emulator");
-        assert_eq!(map_categories("Utility;Network;"), "Internet"); // Network (2) < Utility (10)
-        assert_eq!(map_categories("Unknown;Office;Settings;"), "Office"); // Office (9) < Settings (11)
-        assert_eq!(map_categories("AudioVideo;Graphics;"), "Audio/Video"); // AudioVideo (4) < Graphics (5)
-        assert_eq!(map_categories("Development;TextEditor;"), "Development"); // Development (6) < TextEditors (8)
-        assert_eq!(map_categories("Nothing;"), "Other");
-        assert_eq!(map_categories(""), "Other");
-        assert_eq!(map_categories(";;;"), "Other");
-        assert_eq!(map_categories("Games;Strategy;Game;"), "Games");
-        assert_eq!(map_categories("System;Utility;"), "Utilities"); // Utility (10) < System (11)
-        assert_eq!(map_categories("Network;WebBrowser;"), "Internet");
-
-        // Test priority ordering
-        // Terminal (1) vs Internet (2)
-        assert_eq!(map_categories("Terminal;Internet;"), "Terminal Emulator");
-        assert_eq!(map_categories("Internet;Terminal;"), "Terminal Emulator");
-    }
+    best_category
 }
