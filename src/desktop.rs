@@ -116,10 +116,7 @@ fn desktop_dirs() -> Vec<PathBuf> {
     dirs
 }
 
-fn walk_desktop_files<F>(dir: &Path, callback: &mut F)
-where
-    F: FnMut(PathBuf),
-{
+fn walk_desktop_files(dir: &Path, cb: &mut impl FnMut(PathBuf)) {
     let entries = match fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(_) => return,
@@ -133,11 +130,11 @@ where
         };
 
         if file_type.is_dir() {
-            walk_desktop_files(&path, callback);
+            walk_desktop_files(&path, cb);
         } else if (file_type.is_file() || file_type.is_symlink())
             && path.extension().and_then(|ext| ext.to_str()) == Some("desktop")
         {
-            callback(path);
+            cb(path);
         }
     }
 }
@@ -165,7 +162,7 @@ pub fn parse_desktop_entry(
     path: &Path,
     current_lang: Option<&str>,
     current_desktops: Option<&[String]>,
-    buf: &mut String,
+    line_buf: &mut String,
 ) -> Option<DesktopEntry> {
     let file = fs::File::open(path).ok()?;
     let mut reader = BufReader::new(file);
@@ -174,7 +171,7 @@ pub fn parse_desktop_entry(
     let mut name: Option<String> = None;
     let mut localized_name: Option<String> = None;
     let mut exec: Option<String> = None;
-    let mut categories: String = String::new();
+    let mut categories: Option<String> = None;
     let mut entry_type: Option<String> = None;
     let mut no_display = false;
     let mut hidden = false;
@@ -182,8 +179,8 @@ pub fn parse_desktop_entry(
     let mut not_show_in_raw: Option<String> = None;
 
     loop {
-        buf.clear();
-        match reader.read_line(buf) {
+        line_buf.clear();
+        match reader.read_line(&mut *line_buf) {
             Ok(0) => break,
             Ok(_) => {}
             Err(_) => break,
@@ -217,10 +214,6 @@ pub fn parse_desktop_entry(
                 }
             }
         } else if key == "Exec" {
-            // Fail fast: Check exec validity immediately
-            if !exec_looks_valid(value) {
-                return None;
-            }
             exec = Some(value.to_string());
         } else if key == "Categories" {
             // Store raw string to avoid vector allocation
@@ -267,15 +260,15 @@ pub fn parse_desktop_entry(
     // Exec is required. If not found, return None.
     let exec = exec?;
 
+    if !exec_looks_valid(&exec) {
+        return None;
+    }
+
     let name = localized_name.or(name).or_else(|| {
         path.file_stem()
             .and_then(|stem| stem.to_str())
             .map(|stem| stem.to_string())
     })?;
-
-    if categories.is_empty() {
-        categories = "Other".to_string();
-    }
 
     Some(DesktopEntry {
         name,
@@ -344,9 +337,9 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
 
     let mut entries = Vec::new();
     let mut seen_ids = HashSet::new();
-    let mut buf = String::new();
+    let mut line_buf = String::new();
 
-    let mut process_file = |path: PathBuf| {
+    let mut cb = |path: PathBuf| {
         let id_str = match path.file_name().and_then(|name| name.to_str()) {
             Some(name) => name,
             None => return,
@@ -365,7 +358,7 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
             &path,
             current_lang.as_deref(),
             current_desktops.as_deref(),
-            &mut buf,
+            &mut line_buf,
         ) {
             // exec_looks_valid is now checked inside parse_desktop_entry
             entries.push(entry);
@@ -373,7 +366,7 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
     };
 
     for dir in desktop_dirs() {
-        walk_desktop_files(&dir, &mut process_file);
+        walk_desktop_files(&dir, &mut cb);
     }
 
     entries.sort_by(|a, b| cmp_ignore_ascii_case(&a.name, &b.name));
@@ -384,7 +377,13 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
     let mut map: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     for (i, entry) in entries.iter().enumerate() {
         let bucket = map_categories(&entry.categories);
-        map.entry(bucket.to_string()).or_default().push(i);
+        // Optimization: Use `get_mut` with &str to avoid allocating a new String for lookup.
+        // Only allocate when inserting a new category.
+        if let Some(list) = map.get_mut(bucket) {
+            list.push(i);
+        } else {
+            map.insert(bucket.to_string(), vec![i]);
+        }
     }
     map
 }
@@ -392,43 +391,35 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
 fn map_categories(categories: &str) -> &'static str {
     let has = |needle: &str| categories.split(';').any(|category| category == needle);
 
-    if has("TerminalEmulator") || has("Terminal") {
-        return "Terminal Emulator";
+    for category in categories.split(';') {
+        if category.is_empty() {
+            continue;
+        }
+        let (priority, name) = match category {
+            "TerminalEmulator" | "Terminal" => (1, "Terminal Emulator"),
+            "Network" | "WebBrowser" | "Internet" => (2, "Internet"),
+            "Game" | "Games" => (3, "Games"),
+            "Audio" | "AudioVideo" | "AudioVideoEditing" | "Video" | "VideoConference" => {
+                (4, "Audio/Video")
+            }
+            "Graphics" | "Photography" => (5, "Graphics"),
+            "Development" | "IDE" | "Programming" => (6, "Development"),
+            "Accessory" | "Accessories" => (7, "Accessories"),
+            "TextEditor" => (8, "Text Editors"),
+            "Office" => (9, "Office"),
+            "Utility" | "Utilities" => (10, "Utilities"),
+            "System" | "Settings" => (11, "System"),
+            _ => (12, "Other"),
+        };
+
+        if priority < best_priority {
+            best_priority = priority;
+            best_category = name;
+            // Terminal Emulator is the highest priority, so we can return early.
+            if best_priority == 1 {
+                return best_category;
+            }
+        }
     }
-    if has("Network") || has("WebBrowser") || has("Internet") {
-        return "Internet";
-    }
-    if has("Game") || has("Games") {
-        return "Games";
-    }
-    if has("Audio")
-        || has("AudioVideo")
-        || has("AudioVideoEditing")
-        || has("Video")
-        || has("VideoConference")
-    {
-        return "Audio/Video";
-    }
-    if has("Graphics") || has("Photography") {
-        return "Graphics";
-    }
-    if has("Development") || has("IDE") || has("Programming") {
-        return "Development";
-    }
-    if has("Accessory") || has("Accessories") {
-        return "Accessories";
-    }
-    if has("TextEditor") || has("TextEditor") {
-        return "Text Editors";
-    }
-    if has("Office") {
-        return "Office";
-    }
-    if has("Utility") || has("Utilities") {
-        return "Utilities";
-    }
-    if has("System") || has("Settings") {
-        return "System";
-    }
-    "Other"
+    best_category
 }
