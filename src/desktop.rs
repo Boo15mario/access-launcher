@@ -391,13 +391,8 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
     map
 }
 
-fn map_categories(categories_raw: &str) -> &'static str {
-    let has = |needle: &str| {
-        categories_raw
-            .split(';')
-            .filter(|s| !s.is_empty())
-            .any(|category| category == needle)
-    };
+fn map_categories(categories: &str) -> &'static str {
+    let has = |needle: &str| categories.split(';').any(|category| category == needle);
 
     if has("TerminalEmulator") || has("Terminal") {
         return "Terminal Emulator";
