@@ -388,14 +388,19 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
     map
 }
 
-fn map_categories(categories: &str) -> &'static str {
-    let has = |needle: &str| categories.split(';').any(|category| category == needle);
+fn map_categories(categories_raw: &str) -> &'static str {
+    let mut best_priority = usize::MAX;
+    let mut best_category = "Other";
 
-    for category in categories.split(';') {
+    for category in categories_raw.split(';') {
         if category.is_empty() {
             continue;
         }
-        let (priority, name) = match category {
+
+        // Map categories to a (Priority, Group) tuple.
+        // Lower priority number means higher precedence.
+        // This mapping matches the original if-else chain order.
+        let (priority, result) = match category {
             "TerminalEmulator" | "Terminal" => (1, "Terminal Emulator"),
             "Network" | "WebBrowser" | "Internet" => (2, "Internet"),
             "Game" | "Games" => (3, "Games"),
@@ -409,17 +414,50 @@ fn map_categories(categories: &str) -> &'static str {
             "Office" => (9, "Office"),
             "Utility" | "Utilities" => (10, "Utilities"),
             "System" | "Settings" => (11, "System"),
-            _ => (12, "Other"),
+            _ => continue,
         };
 
         if priority < best_priority {
             best_priority = priority;
-            best_category = name;
-            // Terminal Emulator is the highest priority, so we can return early.
+            best_category = result;
+            // Optimization: If we find the highest priority group, return immediately.
             if best_priority == 1 {
                 return best_category;
             }
         }
     }
+
     best_category
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_map_categories_priorities() {
+        // High priority check
+        assert_eq!(map_categories("TerminalEmulator"), "Terminal Emulator");
+        assert_eq!(map_categories("Terminal"), "Terminal Emulator");
+
+        // Priority precedence: Network (2) vs Game (3) -> Internet
+        assert_eq!(map_categories("Network;Game"), "Internet");
+        assert_eq!(map_categories("Game;Network"), "Internet");
+
+        // Other categories
+        assert_eq!(map_categories("Utility"), "Utilities");
+        assert_eq!(map_categories("Development"), "Development");
+
+        // Fallback
+        assert_eq!(map_categories("UnknownCategory"), "Other");
+        assert_eq!(map_categories(""), "Other");
+        assert_eq!(map_categories(";;;"), "Other");
+
+        // Combined checks
+        assert_eq!(map_categories("Office;TextEditor"), "Text Editors"); // TextEditor (8) < Office (9)
+        assert_eq!(map_categories("Utility;System"), "Utilities"); // Utility (10) < System (11)
+
+        // Single best match
+        assert_eq!(map_categories("Graphics;Unknown"), "Graphics");
+    }
 }
