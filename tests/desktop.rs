@@ -70,7 +70,10 @@ Categories=Utility;Development;
     let entry = parse_desktop_entry(&file.path, None, None, &mut line_buf).expect("entry present");
     assert_eq!(entry.name, "Sample App");
     assert_eq!(entry.exec, "sample --flag");
-    assert_eq!(entry.categories, "Utility;Development;");
+    assert_eq!(
+        entry.categories,
+        "Utility;Development;"
+    );
 }
 
 #[test]
@@ -146,6 +149,7 @@ Exec=app
         .and_then(|name| name.to_str())
         .expect("stem");
     assert_eq!(entry.name, stem);
+    // Categories should be empty string if missing from file
     assert_eq!(entry.categories, "");
 }
 

@@ -216,8 +216,8 @@ pub fn parse_desktop_entry(
         } else if key == "Exec" {
             exec = Some(value.to_string());
         } else if key == "Categories" {
-            // Store raw string to avoid Vec allocation and multiple String allocations
-            categories = Some(value.to_string());
+            // Optimization: Store raw string to avoid allocating Vec and multiple Strings
+            categories = value.to_string();
         } else if key == "Type" {
             entry_type = Some(value.to_string());
         } else if key == "NoDisplay" {
@@ -269,8 +269,6 @@ pub fn parse_desktop_entry(
             .and_then(|stem| stem.to_str())
             .map(|stem| stem.to_string())
     })?;
-
-    let categories = categories.unwrap_or_default();
 
     Some(DesktopEntry {
         name,
