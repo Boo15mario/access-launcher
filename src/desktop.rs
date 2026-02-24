@@ -380,7 +380,13 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
     let mut map: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     for (i, entry) in entries.iter().enumerate() {
         let bucket = map_categories(&entry.categories);
-        map.entry(bucket.to_string()).or_default().push(i);
+        // Optimization: Use `get_mut` with &str to avoid allocating a new String for lookup.
+        // Only allocate when inserting a new category.
+        if let Some(list) = map.get_mut(bucket) {
+            list.push(i);
+        } else {
+            map.insert(bucket.to_string(), vec![i]);
+        }
     }
     map
 }
