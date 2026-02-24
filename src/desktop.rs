@@ -171,7 +171,7 @@ pub fn parse_desktop_entry(
     let mut name: Option<String> = None;
     let mut localized_name: Option<String> = None;
     let mut exec: Option<String> = None;
-    let mut categories: String = String::new();
+    let mut categories = String::new();
     let mut entry_type: Option<String> = None;
     let mut no_display = false;
     let mut hidden = false;
@@ -388,8 +388,7 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
 }
 
 fn map_categories(categories: &str) -> &'static str {
-    let mut best_priority = 13;
-    let mut best_category = "Other";
+    let has = |needle: &str| categories.split(';').any(|category| category == needle);
 
     for category in categories.split(';') {
         if category.is_empty() {

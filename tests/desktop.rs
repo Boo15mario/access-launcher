@@ -146,7 +146,6 @@ Exec=app
         .and_then(|name| name.to_str())
         .expect("stem");
     assert_eq!(entry.name, stem);
-    // Categories are empty by default, which maps to "Other" in map_categories.
     assert_eq!(entry.categories, "");
 }
 
