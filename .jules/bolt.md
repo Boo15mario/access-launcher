@@ -18,6 +18,10 @@
 **Learning:** Delaying allocations for frequently present fields like `Categories` (Vec<String>) can be counter-productive due to the overhead of buffering the raw string (extra allocation/copy). However, for fields used primarily for filtering (like `OnlyShowIn`), storing the raw string and validating lazily avoids vector allocations entirely, which is a win.
 **Action:** Use lazy parsing/validation for optional filter fields, but parse required/common fields eagerly to avoid double-allocation penalties.
 
+## 2026-06-27 - Map Key Allocation
+**Learning:** `BTreeMap::entry(key)` takes ownership of the key, forcing allocation if the key is `String`. Using `get_mut` with `&str` avoids this allocation for lookups.
+**Action:** When working with `BTreeMap<String, V>` (or `HashMap`), use `get_mut` or `get` with `&str` for lookups to avoid allocation, and only allocate when inserting.
+
 ## 2026-07-15 - Zero-Allocation Parsing Loop
 **Learning:** For high-volume file parsing (like scanning hundreds of .desktop files), allocating a new `String` buffer for each file's `read_line` loop adds significant overhead. Passing a reusable mutable buffer from the caller eliminated these repeated allocations.
 **Action:** When parsing many files in a loop, lift the buffer allocation out of the parsing function and pass it as `&mut String`.
