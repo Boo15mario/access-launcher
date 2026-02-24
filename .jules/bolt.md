@@ -18,6 +18,10 @@
 **Learning:** Delaying allocations for frequently present fields like `Categories` (Vec<String>) can be counter-productive due to the overhead of buffering the raw string (extra allocation/copy). However, for fields used primarily for filtering (like `OnlyShowIn`), storing the raw string and validating lazily avoids vector allocations entirely, which is a win.
 **Action:** Use lazy parsing/validation for optional filter fields, but parse required/common fields eagerly to avoid double-allocation penalties.
 
+## 2026-06-27 - Map Key Allocation
+**Learning:** `BTreeMap::entry(key)` takes ownership of the key, forcing allocation if the key is `String`. Using `get_mut` with `&str` avoids this allocation for lookups.
+**Action:** When working with `BTreeMap<String, V>` (or `HashMap`), use `get_mut` or `get` with `&str` for lookups to avoid allocation, and only allocate when inserting.
+
 ## 2026-07-15 - Zero-Allocation Parsing Loop
 **Learning:** For high-volume file parsing (like scanning hundreds of .desktop files), allocating a new `String` buffer for each file's `read_line` loop adds significant overhead. Passing a reusable mutable buffer from the caller eliminated these repeated allocations.
 **Action:** When parsing many files in a loop, lift the buffer allocation out of the parsing function and pass it as `&mut String`.
@@ -29,3 +33,7 @@
 ## 2026-02-04 - Raw String Storage for Categories
 **Learning:** Storing list-like fields (e.g., `Categories`) as `Vec<String>` in high-cardinality structs causes significant allocation overhead (N+1 allocations per entry). Storing the raw delimited string and parsing it lazily via iterators reduced allocations by ~75% for that field and improved parsing throughput by ~6%.
 **Action:** For fields that are parsed eagerly but accessed infrequently or read-only, store the raw string data and use iterator-based accessors instead of eagerly collecting into a Vector.
+
+## 2026-08-28 - Optimize map_categories with Single-Pass Match
+**Learning:** Checking for category membership using repeated string splits and scans (e.g., `filter(...).any(...)`) is O(M*N) and degrades significantly (20x slower) when the target category is checked late in the sequence. A single-pass loop with a `match` statement for priority lookup is O(N) and consistently fast.
+**Action:** When mapping a list of items to a single best-match category based on priority, iterate the list once and maintain the best-seen candidate, rather than iterating the list separately for each potential match.
