@@ -386,35 +386,44 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
     map
 }
 
+fn get_category_priority(cat: &str) -> Option<(u8, &'static str)> {
+    match cat {
+        "TerminalEmulator" | "Terminal" => Some((1, "Terminal Emulator")),
+        "Network" | "WebBrowser" | "Internet" => Some((2, "Internet")),
+        "Game" | "Games" => Some((3, "Games")),
+        "Audio" | "AudioVideo" | "AudioVideoEditing" | "Video" | "VideoConference" => Some((
+            4,
+            "Audio/Video",
+        )),
+        "Graphics" | "Photography" => Some((5, "Graphics")),
+        "Development" | "IDE" | "Programming" => Some((6, "Development")),
+        "Accessory" | "Accessories" => Some((7, "Accessories")),
+        "TextEditor" => Some((8, "Text Editors")),
+        "Office" => Some((9, "Office")),
+        "Utility" | "Utilities" => Some((10, "Utilities")),
+        "System" | "Settings" => Some((11, "System")),
+        _ => None,
+    }
+}
+
 fn map_categories(categories_raw: &str) -> &'static str {
-    let mut best_priority = 100;
-    let mut best_category = "Other";
+    let mut best_prio = u8::MAX;
+    let mut best_group = "Other";
 
-    for category in categories_raw.split(';') {
-        let (priority, group) = match category {
-            "TerminalEmulator" | "Terminal" => (1, "Terminal Emulator"),
-            "Network" | "WebBrowser" | "Internet" => (2, "Internet"),
-            "Game" | "Games" => (3, "Games"),
-            "Audio" | "AudioVideo" | "AudioVideoEditing" | "Video" | "VideoConference" => {
-                (4, "Audio/Video")
-            }
-            "Graphics" | "Photography" => (5, "Graphics"),
-            "Development" | "IDE" | "Programming" => (6, "Development"),
-            "Accessory" | "Accessories" => (7, "Accessories"),
-            "TextEditor" => (8, "Text Editors"),
-            "Office" => (9, "Office"),
-            "Utility" | "Utilities" => (10, "Utilities"),
-            "System" | "Settings" => (11, "System"),
-            _ => continue,
-        };
-
-        if priority < best_priority {
-            best_priority = priority;
-            best_category = group;
-            if best_priority == 1 {
-                break;
+    for cat in categories_raw.split(';') {
+        if cat.is_empty() {
+            continue;
+        }
+        if let Some((prio, group)) = get_category_priority(cat) {
+            if prio < best_prio {
+                best_prio = prio;
+                best_group = group;
+                // Optimization: Found highest possible priority
+                if best_prio == 1 {
+                    return best_group;
+                }
             }
         }
     }
-    best_category
+    best_group
 }
