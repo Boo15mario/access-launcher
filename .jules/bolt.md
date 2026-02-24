@@ -30,6 +30,6 @@
 **Learning:** Collecting all file paths into a `Vec<PathBuf>` before processing them consumes unnecessary memory and delays processing. Using a `FnMut` callback allows processing files immediately as they are discovered, improving cache locality and reducing peak memory usage.
 **Action:** Prefer callback-based traversal over collecting results into a vector when the consumer processes items sequentially.
 
-## 2026-07-20 - Raw String Storage for Categories
-**Learning:** Storing semi-colon separated lists (like `Categories`) as raw `String`s instead of `Vec<String>` reduces parsing overhead significantly by avoiding repeated small allocations and vector growth. Iterating over the raw string with `split()` is efficient and allocation-free.
-**Action:** For read-heavy string lists that are rarely modified, prefer storing the raw delimited string and parsing lazily/on-demand.
+## 2026-07-26 - Optimized Category Parsing
+**Learning:** Eagerly parsing optional list fields like `Categories` into `Vec<String>` causes excessive allocations (1 Vec + N Strings per entry), even for entries that are later discarded. Storing the raw semicolon-separated string avoids these allocations entirely, deferring parsing to the single usage point.
+**Action:** For string list fields in hot parsing loops, prefer storing the raw `String` and parsing lazily via iterator methods (`split`) if the data is consumed infrequently.

@@ -171,7 +171,7 @@ pub fn parse_desktop_entry(
     let mut name: Option<String> = None;
     let mut localized_name: Option<String> = None;
     let mut exec: Option<String> = None;
-    let mut categories = String::new();
+    let mut categories: Option<String> = None;
     let mut entry_type: Option<String> = None;
     let mut no_display = false;
     let mut hidden = false;
@@ -216,7 +216,8 @@ pub fn parse_desktop_entry(
         } else if key == "Exec" {
             exec = Some(value.to_string());
         } else if key == "Categories" {
-            categories = value.to_string();
+            // Store raw string to avoid Vec allocation and multiple String allocations
+            categories = Some(value.to_string());
         } else if key == "Type" {
             entry_type = Some(value.to_string());
         } else if key == "NoDisplay" {
@@ -268,6 +269,8 @@ pub fn parse_desktop_entry(
             .and_then(|stem| stem.to_str())
             .map(|stem| stem.to_string())
     })?;
+
+    let categories = categories.unwrap_or_default();
 
     Some(DesktopEntry {
         name,
