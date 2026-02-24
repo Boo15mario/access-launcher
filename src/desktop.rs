@@ -388,10 +388,9 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
 
 fn map_categories(categories_raw: &str) -> &'static str {
     let mut best_priority = 100;
-    let mut best_group = "Other";
+    let mut best_category = "Other";
 
     for category in categories_raw.split(';') {
-        let category = category.trim();
         if category.is_empty() {
             continue;
         }
@@ -415,11 +414,11 @@ fn map_categories(categories_raw: &str) -> &'static str {
 
         if priority < best_priority {
             best_priority = priority;
-            best_group = group;
+            best_category = group;
             if best_priority == 1 {
-                return best_group;
+                return best_category;
             }
         }
     }
-    best_group
+    best_category
 }

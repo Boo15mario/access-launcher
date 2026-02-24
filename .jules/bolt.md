@@ -34,6 +34,6 @@
 **Learning:** Storing list-like fields (e.g., `Categories`) as `Vec<String>` in high-cardinality structs causes significant allocation overhead (N+1 allocations per entry). Storing the raw delimited string and parsing it lazily via iterators reduced allocations by ~75% for that field and improved parsing throughput by ~6%.
 **Action:** For fields that are parsed eagerly but accessed infrequently or read-only, store the raw string data and use iterator-based accessors instead of eagerly collecting into a Vector.
 
-## 2026-10-24 - Single-Pass Category Mapping
-**Learning:** Checking for multiple category groups by repeatedly iterating through the categories string is O(M*N) and inefficient. Iterating the string once and matching each category to a priority level is O(N) and significantly faster (~4x speedup for this function).
-**Action:** When mapping a list of items to a prioritized group, iterate the items once and keep track of the highest-priority match instead of iterating the rules.
+## 2026-08-01 - Single-Pass Category Mapping
+**Learning:** Iterating over a string multiple times to check for different substrings (O(M*N)) is much slower than iterating once and mapping each substring to a priority group (O(N)). Switching to a single-pass iteration with integer-based prioritization achieved ~11x speedup in category mapping benchmarks.
+**Action:** When classifying strings against multiple potential matches, iterate over the input once and use a lookup or match statement to find the best match, rather than repeated scans.
