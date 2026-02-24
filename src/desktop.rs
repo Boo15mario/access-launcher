@@ -214,10 +214,6 @@ pub fn parse_desktop_entry(
                 }
             }
         } else if key == "Exec" {
-            // Fail fast: Check exec validity immediately
-            if !exec_looks_valid(value) {
-                return None;
-            }
             exec = Some(value.to_string());
         } else if key == "Categories" {
             categories = value.to_string();
@@ -262,6 +258,10 @@ pub fn parse_desktop_entry(
 
     // Exec is required. If not found, return None.
     let exec = exec?;
+
+    if !exec_looks_valid(&exec) {
+        return None;
+    }
 
     let name = localized_name.or(name).or_else(|| {
         path.file_stem()
