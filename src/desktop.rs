@@ -116,10 +116,7 @@ fn desktop_dirs() -> Vec<PathBuf> {
     dirs
 }
 
-fn walk_desktop_files<F>(dir: &Path, callback: &mut F)
-where
-    F: FnMut(PathBuf),
-{
+fn walk_desktop_files(dir: &Path, cb: &mut impl FnMut(PathBuf)) {
     let entries = match fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(_) => return,
@@ -133,11 +130,11 @@ where
         };
 
         if file_type.is_dir() {
-            walk_desktop_files(&path, callback);
+            walk_desktop_files(&path, cb);
         } else if (file_type.is_file() || file_type.is_symlink())
             && path.extension().and_then(|ext| ext.to_str()) == Some("desktop")
         {
-            callback(path);
+            cb(path);
         }
     }
 }
@@ -165,7 +162,7 @@ pub fn parse_desktop_entry(
     path: &Path,
     current_lang: Option<&str>,
     current_desktops: Option<&[String]>,
-    buf: &mut String,
+    line_buf: &mut String,
 ) -> Option<DesktopEntry> {
     let file = fs::File::open(path).ok()?;
     let mut reader = BufReader::new(file);
@@ -182,8 +179,8 @@ pub fn parse_desktop_entry(
     let mut not_show_in_raw: Option<String> = None;
 
     loop {
-        buf.clear();
-        match reader.read_line(buf) {
+        line_buf.clear();
+        match reader.read_line(&mut *line_buf) {
             Ok(0) => break,
             Ok(_) => {}
             Err(_) => break,
@@ -217,10 +214,6 @@ pub fn parse_desktop_entry(
                 }
             }
         } else if key == "Exec" {
-            // Fail fast: Check exec validity immediately
-            if !exec_looks_valid(value) {
-                return None;
-            }
             exec = Some(value.to_string());
         } else if key == "Categories" {
             categories = value.to_string();
@@ -265,6 +258,10 @@ pub fn parse_desktop_entry(
 
     // Exec is required. If not found, return None.
     let exec = exec?;
+
+    if !exec_looks_valid(&exec) {
+        return None;
+    }
 
     let name = localized_name.or(name).or_else(|| {
         path.file_stem()
@@ -339,9 +336,9 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
 
     let mut entries = Vec::new();
     let mut seen_ids = HashSet::new();
-    let mut buf = String::new();
+    let mut line_buf = String::new();
 
-    let mut process_file = |path: PathBuf| {
+    let mut cb = |path: PathBuf| {
         let id_str = match path.file_name().and_then(|name| name.to_str()) {
             Some(name) => name,
             None => return,
@@ -360,7 +357,7 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
             &path,
             current_lang.as_deref(),
             current_desktops.as_deref(),
-            &mut buf,
+            &mut line_buf,
         ) {
             // exec_looks_valid is now checked inside parse_desktop_entry
             entries.push(entry);
@@ -368,7 +365,7 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
     };
 
     for dir in desktop_dirs() {
-        walk_desktop_files(&dir, &mut process_file);
+        walk_desktop_files(&dir, &mut cb);
     }
 
     entries.sort_by(|a, b| cmp_ignore_ascii_case(&a.name, &b.name));
@@ -379,7 +376,13 @@ pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usiz
     let mut map: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     for (i, entry) in entries.iter().enumerate() {
         let bucket = map_categories(&entry.categories);
-        map.entry(bucket.to_string()).or_default().push(i);
+        // Optimization: Use `get_mut` with &str to avoid allocating a new String for lookup.
+        // Only allocate when inserting a new category.
+        if let Some(list) = map.get_mut(bucket) {
+            list.push(i);
+        } else {
+            map.insert(bucket.to_string(), vec![i]);
+        }
     }
     map
 }
