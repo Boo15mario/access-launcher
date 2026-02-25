@@ -186,7 +186,7 @@ pub fn parse_desktop_entry(
             Err(_) => break,
         }
 
-        let line = buf.trim();
+        let line = line_buf.trim();
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
@@ -217,7 +217,7 @@ pub fn parse_desktop_entry(
             exec = Some(value.to_string());
         } else if key == "Categories" {
             // Store raw string to avoid vector allocation
-            categories = value.to_string();
+            categories = Some(value.to_string());
         } else if key == "Type" {
             entry_type = Some(value.to_string());
         } else if key == "NoDisplay" {
@@ -273,7 +273,7 @@ pub fn parse_desktop_entry(
     Some(DesktopEntry {
         name,
         exec,
-        categories,
+        categories: categories.unwrap_or_default(),
         path: path.to_path_buf(),
     })
 }
