@@ -203,7 +203,7 @@ fn exec_looks_valid_handles_complex_cases() {
     assert!(exec_looks_valid(&complex));
 
     // Env with args
-    assert!(exec_looks_valid("/usr/bin/env FOO=bar"));
+    assert!(exec_looks_valid("env FOO=bar"));
 }
 
 #[test]
