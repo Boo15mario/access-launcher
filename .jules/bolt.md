@@ -37,3 +37,7 @@
 ## 2026-02-22 - Single-Pass Category Mapping
 **Learning:** Iterating over a split string multiple times for category checks (O(M*N)) is inefficient compared to a single pass with integer-based prioritization (O(N)). Switching to a single-pass `match` loop reduced category mapping time by ~3x (28ms to 9ms for 100k entries).
 **Action:** When mapping a list of items to a single prioritized result, prefer a single pass that updates a "best so far" variable over multiple passes checking for each possibility.
+
+## 2026-10-24 - Eager Validation to Avoid Allocation
+**Learning:** For fields used purely for filtering (like `Type`, `OnlyShowIn`), validating immediately in the parsing loop and discarding the value avoids allocating even a temporary `String` or `Option<String>`, which saves significant memory traffic in hot loops.
+**Action:** Identify fields that are only used for filtering/validation and check them eagerly without allocating, rather than storing them for later checks.
