@@ -172,11 +172,11 @@ pub fn parse_desktop_entry(
     let mut localized_name: Option<String> = None;
     let mut exec: Option<String> = None;
     let mut categories: Option<String> = None;
-    let mut entry_type: Option<String> = None;
+    let mut is_application = false;
     let mut no_display = false;
     let mut hidden = false;
-    let mut only_show_in_raw: Option<String> = None;
-    let mut not_show_in_raw: Option<String> = None;
+    let mut only_show_in_passed = true;
+    let mut not_show_in_passed = true;
 
     loop {
         line_buf.clear();
@@ -219,42 +219,31 @@ pub fn parse_desktop_entry(
             // Store raw string to avoid vector allocation
             categories = Some(value.to_string());
         } else if key == "Type" {
-            entry_type = Some(value.to_string());
+            is_application = value == "Application";
         } else if key == "NoDisplay" {
             no_display = parse_bool(value);
         } else if key == "Hidden" {
             hidden = parse_bool(value);
         } else if key == "OnlyShowIn" {
-            only_show_in_raw = Some(value.to_string());
+            if let Some(desktops) = current_desktops {
+                only_show_in_passed = value
+                    .split(';')
+                    .filter(|part| !part.is_empty())
+                    .any(|item| desktops.iter().any(|c| c == item));
+            }
         } else if key == "NotShowIn" {
-            not_show_in_raw = Some(value.to_string());
+            if let Some(desktops) = current_desktops {
+                let matches = value
+                    .split(';')
+                    .filter(|part| !part.is_empty())
+                    .any(|item| desktops.iter().any(|c| c == item));
+                not_show_in_passed = !matches;
+            }
         }
     }
 
-    if entry_type.as_deref() != Some("Application") || no_display || hidden {
+    if !is_application || no_display || hidden || !only_show_in_passed || !not_show_in_passed {
         return None;
-    }
-
-    // Lazy validation for OnlyShowIn/NotShowIn without allocating vectors
-    if let Some(current_desktops) = current_desktops {
-        if let Some(only) = &only_show_in_raw {
-            let matches = only
-                .split(';')
-                .filter(|part| !part.is_empty())
-                .any(|item| current_desktops.iter().any(|c| c == item));
-            if !matches {
-                return None;
-            }
-        }
-        if let Some(not) = &not_show_in_raw {
-            let matches = not
-                .split(';')
-                .filter(|part| !part.is_empty())
-                .any(|item| current_desktops.iter().any(|c| c == item));
-            if matches {
-                return None;
-            }
-        }
     }
 
     // Exec is required. If not found, return None.
