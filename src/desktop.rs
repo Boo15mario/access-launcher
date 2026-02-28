@@ -140,7 +140,8 @@ fn walk_desktop_files(dir: &Path, cb: &mut impl FnMut(PathBuf)) {
 }
 
 pub fn normalize_lang_tag(lang: &str) -> &str {
-    lang.split(['.', '@']).next().unwrap_or("")
+    let lang_len = lang.find(['.', '@']).unwrap_or(lang.len());
+    &lang[..lang_len]
 }
 
 pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
@@ -148,9 +149,19 @@ pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
         return false;
     }
     let lang = normalize_lang_tag(lang);
-    lang == tag
-        || (lang.starts_with(tag) && lang.as_bytes().get(tag.len()) == Some(&b'_'))
-        || tag.starts_with(lang)
+
+    // Optimization: fast path for exact length match
+    if lang.len() == tag.len() {
+        return lang == tag;
+    }
+
+    // If the environment language (e.g., de_DE) is longer than the entry's tag (e.g., de)
+    if lang.len() > tag.len() {
+        return lang.starts_with(tag) && lang.as_bytes()[tag.len()] == b'_';
+    }
+
+    // If the entry's tag (e.g., de_DE) is longer than the environment language (e.g., de)
+    tag.starts_with(lang)
 }
 
 pub fn parse_bool(value: &str) -> bool {
