@@ -37,3 +37,7 @@
 ## 2026-02-22 - Single-Pass Category Mapping
 **Learning:** Iterating over a split string multiple times for category checks (O(M*N)) is inefficient compared to a single pass with integer-based prioritization (O(N)). Switching to a single-pass `match` loop reduced category mapping time by ~3x (28ms to 9ms for 100k entries).
 **Action:** When mapping a list of items to a single prioritized result, prefer a single pass that updates a "best so far" variable over multiple passes checking for each possibility.
+
+## 2024-03-01 - Optimizing .desktop file parsing with early returns
+**Learning:** .desktop files contain many entries (like Type=Link, NoDisplay=true, Hidden=true) that mean the file shouldn't be displayed. The original parsing logic read the entire file and eagerly allocated strings for Name, Exec, and Categories before checking these display conditions at the end. In Linux environments with thousands of .desktop files, this causes significant unnecessary allocation overhead. Using `match` on the key slice (found via `line.find('=')`) instead of `split_once` is also slightly faster.
+**Action:** When parsing text formats line-by-line where certain keys invalidate the entire entry, check those keys immediately and use early returns to abort parsing and avoid subsequent allocations.
