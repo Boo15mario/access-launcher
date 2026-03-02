@@ -37,3 +37,7 @@
 ## 2026-02-22 - Single-Pass Category Mapping
 **Learning:** Iterating over a split string multiple times for category checks (O(M*N)) is inefficient compared to a single pass with integer-based prioritization (O(N)). Switching to a single-pass `match` loop reduced category mapping time by ~3x (28ms to 9ms for 100k entries).
 **Action:** When mapping a list of items to a single prioritized result, prefer a single pass that updates a "best so far" variable over multiple passes checking for each possibility.
+
+## 2026-08-01 - Early Return for Filtered Desktop Entries
+**Learning:** Parsing `.desktop` files eagerly allocated memory for fields like `Name` and `Exec` even for entries that were ultimately rejected because `Type != Application` or they were `Hidden`/`NoDisplay`. Replacing `split_once('=')` with `find('=')` and eagerly matching the key slice allowed us to implement an immediate `return None` for these filtered entries, avoiding all subsequent allocations.
+**Action:** Always eagerly check validation fields before allocating memory for payload fields. For string parsing, `find` combined with manual slicing can be slightly more flexible for early returns than `split_once`.

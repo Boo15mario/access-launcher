@@ -1,4 +1,4 @@
-use access_launcher::desktop::{collect_desktop_entries};
+use access_launcher::desktop::collect_desktop_entries;
 use std::env;
 use std::fs;
 use std::time::Instant;
@@ -23,7 +23,9 @@ fn bench_parsing_performance() {
             i, exec_str
         );
         fs::write(
-            temp_dir.join("applications").join(format!("app-{}.desktop", i)),
+            temp_dir
+                .join("applications")
+                .join(format!("app-{}.desktop", i)),
             content_visible,
         )
         .unwrap();
@@ -33,7 +35,9 @@ fn bench_parsing_performance() {
             i, exec_str
         );
         fs::write(
-            temp_dir.join("applications").join(format!("hidden-{}.desktop", i)),
+            temp_dir
+                .join("applications")
+                .join(format!("hidden-{}.desktop", i)),
             content_hidden,
         )
         .unwrap();
@@ -51,7 +55,11 @@ fn bench_parsing_performance() {
     let entries = collect_desktop_entries();
     let duration = start.elapsed();
 
-    println!("Parsed {} entries (1000 visible expected) in {:?}", entries.len(), duration);
+    println!(
+        "Parsed {} entries (1000 visible expected) in {:?}",
+        entries.len(),
+        duration
+    );
 
     // Cleanup
     fs::remove_dir_all(&temp_dir).unwrap();

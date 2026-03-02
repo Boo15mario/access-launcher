@@ -172,9 +172,7 @@ pub fn parse_desktop_entry(
     let mut localized_name: Option<String> = None;
     let mut exec: Option<String> = None;
     let mut categories: Option<String> = None;
-    let mut entry_type: Option<String> = None;
-    let mut no_display = false;
-    let mut hidden = false;
+    let mut has_type_application = false;
     let mut only_show_in_raw: Option<String> = None;
     let mut not_show_in_raw: Option<String> = None;
 
@@ -200,38 +198,46 @@ pub fn parse_desktop_entry(
         if !in_entry {
             continue;
         }
-        let (key, value) = match line.split_once('=') {
-            Some(pair) => pair,
+
+        let eq_idx = match line.find('=') {
+            Some(idx) => idx,
             None => continue,
         };
-        let value = value.trim();
-        if key == "Name" {
-            name = Some(value.to_string());
-        } else if let Some(tag) = key.strip_prefix("Name[").and_then(|k| k.strip_suffix(']')) {
-            if let Some(lang) = current_lang {
-                if matches_lang_tag(tag, lang) {
-                    localized_name = Some(value.to_string());
+
+        let key = &line[..eq_idx];
+        let value = line[eq_idx + 1..].trim();
+
+        // Eagerly check for filtered entries to avoid allocating other fields
+        match key {
+            "Type" => {
+                if value != "Application" {
+                    return None;
+                }
+                has_type_application = true;
+            }
+            "NoDisplay" | "Hidden" => {
+                if parse_bool(value) {
+                    return None;
                 }
             }
-        } else if key == "Exec" {
-            exec = Some(value.to_string());
-        } else if key == "Categories" {
-            // Store raw string to avoid vector allocation
-            categories = Some(value.to_string());
-        } else if key == "Type" {
-            entry_type = Some(value.to_string());
-        } else if key == "NoDisplay" {
-            no_display = parse_bool(value);
-        } else if key == "Hidden" {
-            hidden = parse_bool(value);
-        } else if key == "OnlyShowIn" {
-            only_show_in_raw = Some(value.to_string());
-        } else if key == "NotShowIn" {
-            not_show_in_raw = Some(value.to_string());
+            "Name" => name = Some(value.to_string()),
+            "Exec" => exec = Some(value.to_string()),
+            "Categories" => categories = Some(value.to_string()), // Store raw string to avoid vector allocation
+            "OnlyShowIn" => only_show_in_raw = Some(value.to_string()),
+            "NotShowIn" => not_show_in_raw = Some(value.to_string()),
+            _ => {
+                if let Some(tag) = key.strip_prefix("Name[").and_then(|k| k.strip_suffix(']')) {
+                    if let Some(lang) = current_lang {
+                        if matches_lang_tag(tag, lang) {
+                            localized_name = Some(value.to_string());
+                        }
+                    }
+                }
+            }
         }
     }
 
-    if entry_type.as_deref() != Some("Application") || no_display || hidden {
+    if !has_type_application {
         return None;
     }
 
