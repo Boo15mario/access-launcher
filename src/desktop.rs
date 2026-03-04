@@ -200,34 +200,66 @@ pub fn parse_desktop_entry(
         if !in_entry {
             continue;
         }
-        let (key, value) = match line.split_once('=') {
-            Some(pair) => pair,
+        let eq_pos = match line.find('=') {
+            Some(pos) => pos,
             None => continue,
         };
-        let value = value.trim();
-        if key == "Name" {
-            name = Some(value.to_string());
-        } else if let Some(tag) = key.strip_prefix("Name[").and_then(|k| k.strip_suffix(']')) {
-            if let Some(lang) = current_lang {
-                if matches_lang_tag(tag, lang) {
-                    localized_name = Some(value.to_string());
+        let key = &line[..eq_pos];
+
+        if key.is_empty() {
+            continue;
+        }
+
+        let value = line[eq_pos + 1..].trim();
+
+        // Optimization: Fast path using a jump table on the first byte of the key.
+        // This avoids doing full string comparisons (`== "Categories"`, `== "Name"`, etc.)
+        // for lines that don't match our required keys, which is common in .desktop files
+        // that contain many extra localized strings or app-specific fields.
+        match key.as_bytes()[0] {
+            b'N' => {
+                if key == "Name" {
+                    name = Some(value.to_string());
+                } else if key == "NoDisplay" {
+                    no_display = parse_bool(value);
+                } else if key == "NotShowIn" {
+                    not_show_in_raw = Some(value.to_string());
+                } else if let Some(tag) =
+                    key.strip_prefix("Name[").and_then(|k| k.strip_suffix(']'))
+                {
+                    if let Some(lang) = current_lang {
+                        if matches_lang_tag(tag, lang) {
+                            localized_name = Some(value.to_string());
+                        }
+                    }
                 }
             }
-        } else if key == "Exec" {
-            exec = Some(value.to_string());
-        } else if key == "Categories" {
-            // Store raw string to avoid vector allocation
-            categories = Some(value.to_string());
-        } else if key == "Type" {
-            entry_type = Some(value.to_string());
-        } else if key == "NoDisplay" {
-            no_display = parse_bool(value);
-        } else if key == "Hidden" {
-            hidden = parse_bool(value);
-        } else if key == "OnlyShowIn" {
-            only_show_in_raw = Some(value.to_string());
-        } else if key == "NotShowIn" {
-            not_show_in_raw = Some(value.to_string());
+            b'E' => {
+                if key == "Exec" {
+                    exec = Some(value.to_string());
+                }
+            }
+            b'C' => {
+                if key == "Categories" {
+                    categories = Some(value.to_string());
+                }
+            }
+            b'T' => {
+                if key == "Type" {
+                    entry_type = Some(value.to_string());
+                }
+            }
+            b'H' => {
+                if key == "Hidden" {
+                    hidden = parse_bool(value);
+                }
+            }
+            b'O' => {
+                if key == "OnlyShowIn" {
+                    only_show_in_raw = Some(value.to_string());
+                }
+            }
+            _ => continue,
         }
     }
 

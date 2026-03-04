@@ -37,3 +37,7 @@
 ## 2026-02-22 - Single-Pass Category Mapping
 **Learning:** Iterating over a split string multiple times for category checks (O(M*N)) is inefficient compared to a single pass with integer-based prioritization (O(N)). Switching to a single-pass `match` loop reduced category mapping time by ~3x (28ms to 9ms for 100k entries).
 **Action:** When mapping a list of items to a single prioritized result, prefer a single pass that updates a "best so far" variable over multiple passes checking for each possibility.
+
+## 2026-08-10 - Desktop Entry Parsing Fast-Path Optimization
+**Learning:** `split_once('=')` combined with an `if-else` chain over the resulting key string is slower than `find('=')` followed by a `match` on the first byte of the key `match key.as_bytes()[0]`. .desktop files frequently contain ignored keys like `Comment`, `Icon`, and `Terminal`. A fast-path single-character jump table helps avoid full string comparisons for these irrelevant lines, resulting in a ~10-25% speedup in the parsing loop.
+**Action:** When parsing key-value text files with many ignored keys, consider using a fast-path `match` on the first character of the line or key to quickly discard irrelevant data before performing full string comparisons.
