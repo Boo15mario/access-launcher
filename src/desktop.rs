@@ -200,34 +200,63 @@ pub fn parse_desktop_entry(
         if !in_entry {
             continue;
         }
-        let (key, value) = match line.split_once('=') {
-            Some(pair) => pair,
+        let eq_idx = match line.find('=') {
+            Some(idx) => idx,
             None => continue,
         };
-        let value = value.trim();
-        if key == "Name" {
-            name = Some(value.to_string());
-        } else if let Some(tag) = key.strip_prefix("Name[").and_then(|k| k.strip_suffix(']')) {
-            if let Some(lang) = current_lang {
-                if matches_lang_tag(tag, lang) {
-                    localized_name = Some(value.to_string());
+        let key = &line[..eq_idx];
+        let value = line[eq_idx + 1..].trim();
+
+        if key.is_empty() {
+            continue;
+        }
+
+        // Optimization: Use jump table on first byte to avoid full string comparisons
+        match key.as_bytes()[0] {
+            b'N' => {
+                if key == "Name" {
+                    name = Some(value.to_string());
+                } else if key == "NoDisplay" {
+                    no_display = parse_bool(value);
+                } else if key == "NotShowIn" {
+                    not_show_in_raw = Some(value.to_string());
+                } else if let Some(tag) =
+                    key.strip_prefix("Name[").and_then(|k| k.strip_suffix(']'))
+                {
+                    if let Some(lang) = current_lang {
+                        if matches_lang_tag(tag, lang) {
+                            localized_name = Some(value.to_string());
+                        }
+                    }
                 }
             }
-        } else if key == "Exec" {
-            exec = Some(value.to_string());
-        } else if key == "Categories" {
-            // Store raw string to avoid vector allocation
-            categories = Some(value.to_string());
-        } else if key == "Type" {
-            entry_type = Some(value.to_string());
-        } else if key == "NoDisplay" {
-            no_display = parse_bool(value);
-        } else if key == "Hidden" {
-            hidden = parse_bool(value);
-        } else if key == "OnlyShowIn" {
-            only_show_in_raw = Some(value.to_string());
-        } else if key == "NotShowIn" {
-            not_show_in_raw = Some(value.to_string());
+            b'E' => {
+                if key == "Exec" {
+                    exec = Some(value.to_string());
+                }
+            }
+            b'C' => {
+                if key == "Categories" {
+                    // Store raw string to avoid vector allocation
+                    categories = Some(value.to_string());
+                }
+            }
+            b'T' => {
+                if key == "Type" {
+                    entry_type = Some(value.to_string());
+                }
+            }
+            b'H' => {
+                if key == "Hidden" {
+                    hidden = parse_bool(value);
+                }
+            }
+            b'O' => {
+                if key == "OnlyShowIn" {
+                    only_show_in_raw = Some(value.to_string());
+                }
+            }
+            _ => {}
         }
     }
 

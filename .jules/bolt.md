@@ -37,3 +37,11 @@
 ## 2026-02-22 - Single-Pass Category Mapping
 **Learning:** Iterating over a split string multiple times for category checks (O(M*N)) is inefficient compared to a single pass with integer-based prioritization (O(N)). Switching to a single-pass `match` loop reduced category mapping time by ~3x (28ms to 9ms for 100k entries).
 **Action:** When mapping a list of items to a single prioritized result, prefer a single pass that updates a "best so far" variable over multiple passes checking for each possibility.
+
+## 2026-07-28 - Unconditional Cloning in Set Insertion
+**Learning:** In Rust, replacing a double-lookup pattern like `if !set.contains(&val) { set.insert(val.clone()); }` with `if set.insert(val.clone())` is a performance anti-pattern when `val` requires a heap allocation (e.g., `PathBuf`, `String`). The latter forces unconditional allocation on every check regardless of duplicates.
+**Action:** When inserting owned values (that require cloning) into a HashSet, check for existence via reference `set.contains(&val)` before allocating with `.clone()` for insertion, even if it requires two hash lookups on success.
+
+## 2026-07-28 - Byte-Level Match for Key Routing
+**Learning:** `line.split_once(=)` does full-string splitting and provides string slices for both parts. When routing parsing logic based on a known set of fixed string prefixes, it can be significantly faster to manually find the index, split the slices, and then dispatch using a `match` on the first byte (`key.as_bytes()[0]`) to bypass full string comparisons entirely for irrelevant keys.
+**Action:** When parsing well-known keys in hot loops, use `find` and route logic via a jump table on the first byte (or use length checks) to skip `O(n)` string equality tests.
