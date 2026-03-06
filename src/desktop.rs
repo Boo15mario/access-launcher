@@ -219,11 +219,20 @@ pub fn parse_desktop_entry(
             // Store raw string to avoid vector allocation
             categories = Some(value.to_string());
         } else if key == "Type" {
+            if value != "Application" {
+                return None;
+            }
             entry_type = Some(value.to_string());
         } else if key == "NoDisplay" {
-            no_display = parse_bool(value);
+            if parse_bool(value) {
+                return None;
+            }
+            no_display = false;
         } else if key == "Hidden" {
-            hidden = parse_bool(value);
+            if parse_bool(value) {
+                return None;
+            }
+            hidden = false;
         } else if key == "OnlyShowIn" {
             only_show_in_raw = Some(value.to_string());
         } else if key == "NotShowIn" {
