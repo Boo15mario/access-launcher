@@ -172,9 +172,7 @@ pub fn parse_desktop_entry(
     let mut localized_name: Option<String> = None;
     let mut exec: Option<String> = None;
     let mut categories: Option<String> = None;
-    let mut entry_type: Option<String> = None;
-    let mut no_display = false;
-    let mut hidden = false;
+    let mut entry_type_is_app = false;
     let mut only_show_in_raw: Option<String> = None;
     let mut not_show_in_raw: Option<String> = None;
 
@@ -200,47 +198,73 @@ pub fn parse_desktop_entry(
         if !in_entry {
             continue;
         }
-        let (key, value) = match line.split_once('=') {
-            Some(pair) => pair,
+
+        // Fast-path for finding '=' and avoiding full string parsing overhead
+        let eq_idx = match line.find('=') {
+            Some(idx) => idx,
             None => continue,
         };
-        let value = value.trim();
-        if key == "Name" {
-            name = Some(value.to_string());
-        } else if let Some(tag) = key.strip_prefix("Name[").and_then(|k| k.strip_suffix(']')) {
-            if let Some(lang) = current_lang {
-                if matches_lang_tag(tag, lang) {
-                    localized_name = Some(value.to_string());
+
+        let key = &line[..eq_idx];
+        if key.is_empty() {
+            continue;
+        }
+
+        let value = line[eq_idx + 1..].trim();
+
+        // Fast-path dispatch on the first byte of the key
+        match key.as_bytes()[0] {
+            b'N' => {
+                if key == "Name" {
+                    name = Some(value.to_string());
+                } else if key == "NoDisplay" && parse_bool(value) {
+                    return None;
+                } else if key == "NotShowIn" {
+                    not_show_in_raw = Some(value.to_string());
+                } else if let Some(tag) =
+                    key.strip_prefix("Name[").and_then(|k| k.strip_suffix(']'))
+                {
+                    if let Some(lang) = current_lang {
+                        if matches_lang_tag(tag, lang) {
+                            localized_name = Some(value.to_string());
+                        }
+                    }
                 }
             }
-        } else if key == "Exec" {
-            exec = Some(value.to_string());
-        } else if key == "Categories" {
-            // Store raw string to avoid vector allocation
-            categories = Some(value.to_string());
-        } else if key == "Type" {
-            if value != "Application" {
-                return None;
+            b'E' => {
+                if key == "Exec" {
+                    exec = Some(value.to_string());
+                }
             }
-            entry_type = Some(value.to_string());
-        } else if key == "NoDisplay" {
-            if parse_bool(value) {
-                return None;
+            b'C' => {
+                if key == "Categories" {
+                    // Store raw string to avoid vector allocation
+                    categories = Some(value.to_string());
+                }
             }
-            no_display = false;
-        } else if key == "Hidden" {
-            if parse_bool(value) {
-                return None;
+            b'T' => {
+                if key == "Type" {
+                    if value != "Application" {
+                        return None;
+                    }
+                    entry_type_is_app = true;
+                }
             }
-            hidden = false;
-        } else if key == "OnlyShowIn" {
-            only_show_in_raw = Some(value.to_string());
-        } else if key == "NotShowIn" {
-            not_show_in_raw = Some(value.to_string());
+            b'H' => {
+                if key == "Hidden" && parse_bool(value) {
+                    return None;
+                }
+            }
+            b'O' => {
+                if key == "OnlyShowIn" {
+                    only_show_in_raw = Some(value.to_string());
+                }
+            }
+            _ => {}
         }
     }
 
-    if entry_type.as_deref() != Some("Application") || no_display || hidden {
+    if !entry_type_is_app {
         return None;
     }
 
