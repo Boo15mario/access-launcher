@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2026-08-01 - Fast-Path Desktop Entry Key Matching
+**Learning:** Using `line.split_once('=')` on every line of a .desktop file incurs unnecessary slice creation overhead. Using `line.find('=')` combined with a fast-path match on the first byte of the key (`match key.as_bytes()[0]`) eliminates unnecessary string comparisons and is significantly faster for structured text parsing. Additionally, replacing an allocated string option `Option<String>` for fields like `Type` with a boolean flag avoids heap allocation and enables faster final validation.
+**Action:** When parsing key-value text files with known fixed keys, use `find` and a single-byte jump table on the prefix. Minimize String allocations by using boolean flags for keys where only specific values matter (like `Type=Application`).
