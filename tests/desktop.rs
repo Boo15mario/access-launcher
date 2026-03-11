@@ -70,10 +70,7 @@ Categories=Utility;Development;
     let entry = parse_desktop_entry(&file.path, None, None, &mut line_buf).expect("entry present");
     assert_eq!(entry.name, "Sample App");
     assert_eq!(entry.exec, "sample --flag");
-    assert_eq!(
-        entry.categories,
-        "Utility;Development;"
-    );
+    assert_eq!(entry.categories, "Utility;Development;");
 }
 
 #[test]
@@ -89,7 +86,8 @@ Exec=app
         "access-launcher-localized",
     );
     let mut line_buf = String::new();
-    let entry = parse_desktop_entry(&file.path, Some("en_US.UTF-8"), None, &mut line_buf).expect("entry present");
+    let entry = parse_desktop_entry(&file.path, Some("en_US.UTF-8"), None, &mut line_buf)
+        .expect("entry present");
     assert_eq!(entry.name, "Localized Name");
 }
 

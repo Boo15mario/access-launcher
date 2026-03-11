@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2024-05-18 - Fast-Path Parsing Optimization
+**Learning:** In hot loops processing string key-value pairs (like parsing `.desktop` files), `line.split_once('=')` combined with extensive string comparisons for all possible keys creates overhead. `String` allocations for known-enum values (like `Type=Application`) also add up over thousands of files.
+**Action:** Use `line.find('=')` to manually split and a jump table `match key.as_bytes()[0]` on the first byte to drastically reduce string comparisons. Store simple flags instead of allocated `String`s for known types.
