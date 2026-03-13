@@ -172,9 +172,7 @@ pub fn parse_desktop_entry(
     let mut localized_name: Option<String> = None;
     let mut exec: Option<String> = None;
     let mut categories: Option<String> = None;
-    let mut entry_type: Option<String> = None;
-    let mut no_display = false;
-    let mut hidden = false;
+    let mut is_application = false;
     let mut only_show_in_raw: Option<String> = None;
     let mut not_show_in_raw: Option<String> = None;
 
@@ -187,10 +185,18 @@ pub fn parse_desktop_entry(
         }
 
         let line = line_buf.trim();
-        if line.is_empty() || line.starts_with('#') {
+        if line.is_empty() {
             continue;
         }
-        if line.starts_with('[') && line.ends_with(']') {
+
+        let bytes = line.as_bytes();
+        let first_byte = bytes[0];
+
+        if first_byte == b'#' {
+            continue;
+        }
+
+        if first_byte == b'[' && line.ends_with(']') {
             if in_entry {
                 break;
             }
@@ -200,66 +206,114 @@ pub fn parse_desktop_entry(
         if !in_entry {
             continue;
         }
-        let (key, value) = match line.split_once('=') {
-            Some(pair) => pair,
+
+        let eq_idx = match line.find('=') {
+            Some(idx) => idx,
             None => continue,
         };
-        let value = value.trim();
-        if key == "Name" {
-            name = Some(value.to_string());
-        } else if let Some(tag) = key.strip_prefix("Name[").and_then(|k| k.strip_suffix(']')) {
-            if let Some(lang) = current_lang {
-                if matches_lang_tag(tag, lang) {
-                    localized_name = Some(value.to_string());
+        let key = &line[..eq_idx];
+        let value = line[eq_idx + 1..].trim();
+
+        if key.is_empty() {
+            continue;
+        }
+
+        match key.as_bytes()[0] {
+            b'N' => {
+                if key == "Name" {
+                    name = Some(value.to_string());
+                } else if key == "NoDisplay" {
+                    if parse_bool(value) {
+                        return None;
+                    }
+                } else if key == "NotShowIn" {
+                    not_show_in_raw = Some(value.to_string());
+                } else if let Some(tag) =
+                    key.strip_prefix("Name[").and_then(|k| k.strip_suffix(']'))
+                {
+                    if let Some(lang) = current_lang {
+                        if matches_lang_tag(tag, lang) {
+                            localized_name = Some(value.to_string());
+                        }
+                    }
                 }
             }
-        } else if key == "Exec" {
-            exec = Some(value.to_string());
-        } else if key == "Categories" {
-            // Store raw string to avoid vector allocation
-            categories = Some(value.to_string());
-        } else if key == "Type" {
-            if value != "Application" {
-                return None;
+            b'E' => {
+                if key == "Exec" {
+                    exec = Some(value.to_string());
+                }
             }
-            entry_type = Some(value.to_string());
-        } else if key == "NoDisplay" {
-            if parse_bool(value) {
-                return None;
+            b'C' => {
+                if key == "Categories" {
+                    // Store raw string to avoid vector allocation
+                    categories = Some(value.to_string());
+                }
             }
-            no_display = false;
-        } else if key == "Hidden" {
-            if parse_bool(value) {
-                return None;
+            b'T' => {
+                if key == "Type" {
+                    if value != "Application" {
+                        return None;
+                    }
+                    is_application = true;
+                }
             }
-            hidden = false;
-        } else if key == "OnlyShowIn" {
-            only_show_in_raw = Some(value.to_string());
-        } else if key == "NotShowIn" {
-            not_show_in_raw = Some(value.to_string());
+            b'H' => {
+                if key == "Hidden"
+                    && parse_bool(value) {
+                        return None;
+                    }
+            }
+            b'O' => {
+                if key == "OnlyShowIn" {
+                    only_show_in_raw = Some(value.to_string());
+                }
+            }
+            _ => {}
         }
     }
 
-    if entry_type.as_deref() != Some("Application") || no_display || hidden {
+    if !is_application {
         return None;
     }
 
     // Lazy validation for OnlyShowIn/NotShowIn without allocating vectors
     if let Some(current_desktops) = current_desktops {
         if let Some(only) = &only_show_in_raw {
-            let matches = only
-                .split(';')
-                .filter(|part| !part.is_empty())
-                .any(|item| current_desktops.iter().any(|c| c == item));
+            let mut matches = false;
+            for part in only.split(';') {
+                if part.is_empty() {
+                    continue;
+                }
+                for c in current_desktops.iter() {
+                    if c == part {
+                        matches = true;
+                        break;
+                    }
+                }
+                if matches {
+                    break;
+                }
+            }
             if !matches {
                 return None;
             }
         }
         if let Some(not) = &not_show_in_raw {
-            let matches = not
-                .split(';')
-                .filter(|part| !part.is_empty())
-                .any(|item| current_desktops.iter().any(|c| c == item));
+            let mut matches = false;
+            for part in not.split(';') {
+                if part.is_empty() {
+                    continue;
+                }
+                for c in current_desktops.iter() {
+                    if c == part {
+                        matches = true;
+                        break;
+                    }
+                }
+                if matches {
+                    break;
+                }
+            }
             if matches {
                 return None;
             }
