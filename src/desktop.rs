@@ -172,9 +172,7 @@ pub fn parse_desktop_entry(
     let mut localized_name: Option<String> = None;
     let mut exec: Option<String> = None;
     let mut categories: Option<String> = None;
-    let mut entry_type: Option<String> = None;
-    let mut no_display = false;
-    let mut hidden = false;
+    let mut is_application = false;
     let mut only_show_in_raw: Option<String> = None;
     let mut not_show_in_raw: Option<String> = None;
 
@@ -200,47 +198,68 @@ pub fn parse_desktop_entry(
         if !in_entry {
             continue;
         }
-        let (key, value) = match line.split_once('=') {
-            Some(pair) => pair,
+        let (key, value) = match line.find('=') {
+            Some(idx) => (&line[..idx], &line[idx + 1..]),
             None => continue,
         };
         let value = value.trim();
-        if key == "Name" {
-            name = Some(value.to_string());
-        } else if let Some(tag) = key.strip_prefix("Name[").and_then(|k| k.strip_suffix(']')) {
-            if let Some(lang) = current_lang {
-                if matches_lang_tag(tag, lang) {
-                    localized_name = Some(value.to_string());
+
+        let first_byte = key.as_bytes().first().copied().unwrap_or(0);
+        match first_byte {
+            b'N' => {
+                if key == "Name" {
+                    name = Some(value.to_string());
+                } else if let Some(tag) =
+                    key.strip_prefix("Name[").and_then(|k| k.strip_suffix(']'))
+                {
+                    if let Some(lang) = current_lang {
+                        if matches_lang_tag(tag, lang) {
+                            localized_name = Some(value.to_string());
+                        }
+                    }
+                } else if key == "NoDisplay" {
+                    if parse_bool(value) {
+                        return None;
+                    }
+                } else if key == "NotShowIn" {
+                    not_show_in_raw = Some(value.to_string());
                 }
             }
-        } else if key == "Exec" {
-            exec = Some(value.to_string());
-        } else if key == "Categories" {
-            // Store raw string to avoid vector allocation
-            categories = Some(value.to_string());
-        } else if key == "Type" {
-            if value != "Application" {
-                return None;
+            b'E' => {
+                if key == "Exec" {
+                    exec = Some(value.to_string());
+                }
             }
-            entry_type = Some(value.to_string());
-        } else if key == "NoDisplay" {
-            if parse_bool(value) {
-                return None;
+            b'C' => {
+                if key == "Categories" {
+                    // Store raw string to avoid vector allocation
+                    categories = Some(value.to_string());
+                }
             }
-            no_display = false;
-        } else if key == "Hidden" {
-            if parse_bool(value) {
-                return None;
+            b'T' => {
+                if key == "Type" {
+                    if value != "Application" {
+                        return None;
+                    }
+                    is_application = true;
+                }
             }
-            hidden = false;
-        } else if key == "OnlyShowIn" {
-            only_show_in_raw = Some(value.to_string());
-        } else if key == "NotShowIn" {
-            not_show_in_raw = Some(value.to_string());
+            b'H' => {
+                if key == "Hidden"
+                    && parse_bool(value) {
+                        return None;
+                    }
+            }
+            b'O' => {
+                if key == "OnlyShowIn" {
+                    only_show_in_raw = Some(value.to_string());
+                }
+            }
+            _ => {}
         }
     }
 
-    if entry_type.as_deref() != Some("Application") || no_display || hidden {
+    if !is_application {
         return None;
     }
 
@@ -324,9 +343,15 @@ fn cmp_ignore_ascii_case(a: &str, b: &str) -> std::cmp::Ordering {
     let len = a_bytes.len().min(b_bytes.len());
 
     for i in 0..len {
-        let c1 = a_bytes[i].to_ascii_lowercase();
-        let c2 = b_bytes[i].to_ascii_lowercase();
-        match c1.cmp(&c2) {
+        let c1 = a_bytes[i];
+        let c2 = b_bytes[i];
+        // Optimization: identical bytes are equal regardless of case.
+        if c1 == c2 {
+            continue;
+        }
+        let c1_lc = c1.to_ascii_lowercase();
+        let c2_lc = c2.to_ascii_lowercase();
+        match c1_lc.cmp(&c2_lc) {
             std::cmp::Ordering::Equal => continue,
             ord => return ord,
         }
