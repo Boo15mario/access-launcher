@@ -70,10 +70,7 @@ Categories=Utility;Development;
     let entry = parse_desktop_entry(&file.path, None, None, &mut line_buf).expect("entry present");
     assert_eq!(entry.name, "Sample App");
     assert_eq!(entry.exec, "sample --flag");
-    assert_eq!(
-        entry.categories,
-        "Utility;Development;"
-    );
+    assert_eq!(entry.categories, "Utility;Development;");
 }
 
 #[test]
@@ -89,7 +86,8 @@ Exec=app
         "access-launcher-localized",
     );
     let mut line_buf = String::new();
-    let entry = parse_desktop_entry(&file.path, Some("en_US.UTF-8"), None, &mut line_buf).expect("entry present");
+    let entry = parse_desktop_entry(&file.path, Some("en_US.UTF-8"), None, &mut line_buf)
+        .expect("entry present");
     assert_eq!(entry.name, "Localized Name");
 }
 
@@ -110,6 +108,22 @@ OnlyShowIn=GNOME;
     let mut line_buf = String::new();
     assert!(parse_desktop_entry(&file.path, None, Some(&gnome), &mut line_buf).is_some());
     assert!(parse_desktop_entry(&file.path, None, Some(&kde), &mut line_buf).is_none());
+}
+
+#[test]
+fn parse_desktop_entry_only_show_in_without_current_desktop_is_allowed() {
+    let file = TempFile::new(
+        r#"
+[Desktop Entry]
+Type=Application
+Name=Desktop Filter
+Exec=app
+OnlyShowIn=GNOME;
+"#,
+        "access-launcher-only-show-in-none",
+    );
+    let mut line_buf = String::new();
+    assert!(parse_desktop_entry(&file.path, None, None, &mut line_buf).is_some());
 }
 
 #[test]

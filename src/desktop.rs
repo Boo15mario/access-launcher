@@ -140,7 +140,8 @@ fn walk_desktop_files(dir: &Path, cb: &mut impl FnMut(PathBuf)) {
 }
 
 pub fn normalize_lang_tag(lang: &str) -> &str {
-    lang.split(['.', '@']).next().unwrap_or("")
+    let lang_len = lang.find(['.', '@']).unwrap_or(lang.len());
+    &lang[..lang_len]
 }
 
 pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
@@ -148,14 +149,32 @@ pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
         return false;
     }
     let lang = normalize_lang_tag(lang);
-    lang == tag
-        || (lang.starts_with(tag) && lang.as_bytes().get(tag.len()) == Some(&b'_'))
-        || tag.starts_with(lang)
+    match lang.len().cmp(&tag.len()) {
+        std::cmp::Ordering::Equal => lang == tag,
+        std::cmp::Ordering::Greater => {
+            lang.starts_with(tag) && lang.as_bytes().get(tag.len()) == Some(&b'_')
+        }
+        std::cmp::Ordering::Less => tag.starts_with(lang),
+    }
 }
 
 pub fn parse_bool(value: &str) -> bool {
     let value = value.trim();
     value.eq_ignore_ascii_case("true") || value == "1" || value.eq_ignore_ascii_case("yes")
+}
+
+fn desktop_list_matches(value: &str, current_desktops: &[String]) -> bool {
+    for part in value.split(';') {
+        if part.is_empty() {
+            continue;
+        }
+        for desktop in current_desktops {
+            if desktop == part {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 pub fn parse_desktop_entry(
@@ -172,11 +191,7 @@ pub fn parse_desktop_entry(
     let mut localized_name: Option<String> = None;
     let mut exec: Option<String> = None;
     let mut categories: Option<String> = None;
-    let mut entry_type: Option<String> = None;
-    let mut no_display = false;
-    let mut hidden = false;
-    let mut only_show_in_raw: Option<String> = None;
-    let mut not_show_in_raw: Option<String> = None;
+    let mut is_application = false;
 
     loop {
         line_buf.clear();
@@ -187,10 +202,16 @@ pub fn parse_desktop_entry(
         }
 
         let line = line_buf.trim();
-        if line.is_empty() || line.starts_with('#') {
+        if line.is_empty() {
             continue;
         }
-        if line.starts_with('[') && line.ends_with(']') {
+
+        let first_byte = line.as_bytes()[0];
+        if first_byte == b'#' {
+            continue;
+        }
+
+        if first_byte == b'[' && line.ends_with(']') {
             if in_entry {
                 break;
             }
@@ -200,70 +221,81 @@ pub fn parse_desktop_entry(
         if !in_entry {
             continue;
         }
-        let (key, value) = match line.split_once('=') {
-            Some(pair) => pair,
+
+        let eq_idx = match line.find('=') {
+            Some(idx) => idx,
             None => continue,
         };
-        let value = value.trim();
-        if key == "Name" {
-            name = Some(value.to_string());
-        } else if let Some(tag) = key.strip_prefix("Name[").and_then(|k| k.strip_suffix(']')) {
-            if let Some(lang) = current_lang {
-                if matches_lang_tag(tag, lang) {
-                    localized_name = Some(value.to_string());
+
+        let key = &line[..eq_idx];
+        if key.is_empty() {
+            continue;
+        }
+
+        let value = line[eq_idx + 1..].trim();
+        match key.as_bytes()[0] {
+            b'N' => {
+                if key == "Name" {
+                    name = Some(value.to_string());
+                } else if key == "NoDisplay" {
+                    if parse_bool(value) {
+                        return None;
+                    }
+                } else if key == "NotShowIn" {
+                    if let Some(current_desktops) = current_desktops {
+                        if desktop_list_matches(value, current_desktops) {
+                            return None;
+                        }
+                    }
+                } else if let Some(tag) =
+                    key.strip_prefix("Name[").and_then(|k| k.strip_suffix(']'))
+                {
+                    if let Some(lang) = current_lang {
+                        if matches_lang_tag(tag, lang) {
+                            localized_name = Some(value.to_string());
+                        }
+                    }
                 }
             }
-        } else if key == "Exec" {
-            exec = Some(value.to_string());
-        } else if key == "Categories" {
-            // Store raw string to avoid vector allocation
-            categories = Some(value.to_string());
-        } else if key == "Type" {
-            if value != "Application" {
-                return None;
+            b'E' => {
+                if key == "Exec" {
+                    exec = Some(value.to_string());
+                }
             }
-            entry_type = Some(value.to_string());
-        } else if key == "NoDisplay" {
-            if parse_bool(value) {
-                return None;
+            b'C' => {
+                if key == "Categories" {
+                    // Store raw string to avoid vector allocation
+                    categories = Some(value.to_string());
+                }
             }
-            no_display = false;
-        } else if key == "Hidden" {
-            if parse_bool(value) {
-                return None;
+            b'T' => {
+                if key == "Type" {
+                    if value != "Application" {
+                        return None;
+                    }
+                    is_application = true;
+                }
             }
-            hidden = false;
-        } else if key == "OnlyShowIn" {
-            only_show_in_raw = Some(value.to_string());
-        } else if key == "NotShowIn" {
-            not_show_in_raw = Some(value.to_string());
+            b'H' => {
+                if key == "Hidden" && parse_bool(value) {
+                    return None;
+                }
+            }
+            b'O' => {
+                if key == "OnlyShowIn" {
+                    if let Some(current_desktops) = current_desktops {
+                        if !desktop_list_matches(value, current_desktops) {
+                            return None;
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
     }
 
-    if entry_type.as_deref() != Some("Application") || no_display || hidden {
+    if !is_application {
         return None;
-    }
-
-    // Lazy validation for OnlyShowIn/NotShowIn without allocating vectors
-    if let Some(current_desktops) = current_desktops {
-        if let Some(only) = &only_show_in_raw {
-            let matches = only
-                .split(';')
-                .filter(|part| !part.is_empty())
-                .any(|item| current_desktops.iter().any(|c| c == item));
-            if !matches {
-                return None;
-            }
-        }
-        if let Some(not) = &not_show_in_raw {
-            let matches = not
-                .split(';')
-                .filter(|part| !part.is_empty())
-                .any(|item| current_desktops.iter().any(|c| c == item));
-            if matches {
-                return None;
-            }
-        }
     }
 
     // Exec is required. If not found, return None.
@@ -324,9 +356,12 @@ fn cmp_ignore_ascii_case(a: &str, b: &str) -> std::cmp::Ordering {
     let len = a_bytes.len().min(b_bytes.len());
 
     for i in 0..len {
-        let c1 = a_bytes[i].to_ascii_lowercase();
-        let c2 = b_bytes[i].to_ascii_lowercase();
-        match c1.cmp(&c2) {
+        let c1 = a_bytes[i];
+        let c2 = b_bytes[i];
+        if c1 == c2 {
+            continue;
+        }
+        match c1.to_ascii_lowercase().cmp(&c2.to_ascii_lowercase()) {
             std::cmp::Ordering::Equal => continue,
             ord => return ord,
         }
