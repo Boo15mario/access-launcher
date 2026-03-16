@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2026-03-01 - Static String Map Keys
+**Learning:** When building a `BTreeMap` where the keys map to a fixed, known set of strings (like category names), using `String` keys incurs significant allocation overhead during map construction. Refactoring to use `&'static str` eliminated these allocations entirely, improving map build performance by ~12%.
+**Action:** Identify maps where keys are effectively enums or fixed string constants, and use `&'static str` as the key type to prevent unnecessary heap allocations.
