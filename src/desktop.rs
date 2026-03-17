@@ -417,14 +417,17 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
     entries
 }
 
-pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usize>> {
-    let mut map: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<&'static str, Vec<usize>> {
+    // Optimization: We use &'static str as the key for the BTreeMap.
+    // map_categories returns a static string slice. By using it directly as the key,
+    // we avoid allocating a new String for every category bucket we insert into the map.
+    let mut map: BTreeMap<&'static str, Vec<usize>> = BTreeMap::new();
     for (i, entry) in entries.iter().enumerate() {
         let bucket = map_categories(&entry.categories);
         if let Some(list) = map.get_mut(bucket) {
             list.push(i);
         } else {
-            map.insert(bucket.to_string(), vec![i]);
+            map.insert(bucket, vec![i]);
         }
     }
     map
