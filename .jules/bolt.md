@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2026-08-01 - Avoid Per-Item Environment Parsing
+**Learning:** Calling `env::var` inside a loop or mapping its string result directly into an array of owned `String` allocations scales poorly. By reading the environment variable once into a single String and collecting non-allocating string slices (`&str`), we eliminated memory allocation per item.
+**Action:** Lift environment string allocations outside of loops, and use generic `impl AsRef<str>` arguments to accept references instead of `String` when possible.
