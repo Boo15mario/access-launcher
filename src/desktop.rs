@@ -160,7 +160,16 @@ pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
 
 pub fn parse_bool(value: &str) -> bool {
     let value = value.trim();
-    value.eq_ignore_ascii_case("true") || value == "1" || value.eq_ignore_ascii_case("yes")
+    let len = value.len();
+    if len == 4 {
+        value.eq_ignore_ascii_case("true")
+    } else if len == 1 {
+        value == "1"
+    } else if len == 3 {
+        value.eq_ignore_ascii_case("yes")
+    } else {
+        false
+    }
 }
 
 fn desktop_list_matches(value: &str, current_desktops: &[String]) -> bool {
