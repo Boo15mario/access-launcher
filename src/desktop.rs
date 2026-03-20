@@ -148,13 +148,45 @@ pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
     if tag.is_empty() || lang.is_empty() {
         return false;
     }
-    let lang = normalize_lang_tag(lang);
-    match lang.len().cmp(&tag.len()) {
-        std::cmp::Ordering::Equal => lang == tag,
-        std::cmp::Ordering::Greater => {
-            lang.starts_with(tag) && lang.as_bytes().get(tag.len()) == Some(&b'_')
+
+    // We only need to check matching bytes up to tag.len().
+    // Iterate manually to avoid allocation and find() overhead
+    let tag_bytes = tag.as_bytes();
+    let lang_bytes = lang.as_bytes();
+
+    let tag_len = tag_bytes.len();
+    let lang_len = lang_bytes.len();
+
+    let mut i = 0;
+    while i < tag_len && i < lang_len {
+        let l = lang_bytes[i];
+        if l == b'.' || l == b'@' {
+            // lang is shorter than tag (because it ends with . or @)
+            // SAFETY: `i` is a valid UTF-8 boundary because we only matched ASCII bytes
+            // before this point, and '.' and '@' are ASCII.
+            return tag.starts_with(unsafe { std::str::from_utf8_unchecked(&lang_bytes[..i]) });
         }
-        std::cmp::Ordering::Less => tag.starts_with(lang),
+        if l != tag_bytes[i] {
+            return false;
+        }
+        i += 1;
+    }
+
+    if i == tag_len {
+        if i == lang_len {
+            return true;
+        }
+        let l = lang_bytes[i];
+        if l == b'.' || l == b'@' {
+            return true;
+        }
+        if l == b'_' {
+            return true;
+        }
+        false
+    } else {
+        // i == lang_len < tag_len
+        tag.starts_with(lang)
     }
 }
 
@@ -163,17 +195,35 @@ pub fn parse_bool(value: &str) -> bool {
     value.eq_ignore_ascii_case("true") || value == "1" || value.eq_ignore_ascii_case("yes")
 }
 
-fn desktop_list_matches(value: &str, current_desktops: &[String]) -> bool {
-    for part in value.split(';') {
-        if part.is_empty() {
-            continue;
+fn desktop_list_matches(value: &str, current_desktops: &[impl AsRef<str>]) -> bool {
+    // Avoid iterators in hot loops
+    let bytes = value.as_bytes();
+    let mut start = 0;
+    let len = bytes.len();
+
+    for i in 0..len {
+        if bytes[i] == b';' {
+            if start < i {
+                let part = &value[start..i];
+                for desktop in current_desktops {
+                    if desktop.as_ref() == part {
+                        return true;
+                    }
+                }
+            }
+            start = i + 1;
         }
+    }
+
+    if start < len {
+        let part = &value[start..];
         for desktop in current_desktops {
-            if desktop == part {
+            if desktop.as_ref() == part {
                 return true;
             }
         }
     }
+
     false
 }
 
