@@ -148,14 +148,33 @@ pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
     if tag.is_empty() || lang.is_empty() {
         return false;
     }
-    let lang = normalize_lang_tag(lang);
-    match lang.len().cmp(&tag.len()) {
-        std::cmp::Ordering::Equal => lang == tag,
-        std::cmp::Ordering::Greater => {
-            lang.starts_with(tag) && lang.as_bytes().get(tag.len()) == Some(&b'_')
+
+    let lang_bytes = lang.as_bytes();
+    let tag_bytes = tag.as_bytes();
+
+    let mut i = 0;
+    while i < tag_bytes.len() {
+        if i >= lang_bytes.len() {
+            return true;
         }
-        std::cmp::Ordering::Less => tag.starts_with(lang),
+        let lc = lang_bytes[i];
+        if lc == b'.' || lc == b'@' {
+            return true;
+        }
+        if lc != tag_bytes[i] {
+            return false;
+        }
+        i += 1;
     }
+
+    if i < lang_bytes.len() {
+        let next_c = lang_bytes[i];
+        if next_c != b'.' && next_c != b'@' && next_c != b'_' {
+            return false;
+        }
+    }
+
+    true
 }
 
 pub fn parse_bool(value: &str) -> bool {
