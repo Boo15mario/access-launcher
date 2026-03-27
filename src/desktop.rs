@@ -132,7 +132,8 @@ fn walk_desktop_files(dir: &Path, cb: &mut impl FnMut(PathBuf)) {
         if file_type.is_dir() {
             walk_desktop_files(&path, cb);
         } else if (file_type.is_file() || file_type.is_symlink())
-            && path.extension().and_then(|ext| ext.to_str()) == Some("desktop")
+            // Optimization: checking raw path bytes avoids option matching and utf8 string conversion overhead
+            && path.as_os_str().as_encoded_bytes().ends_with(b".desktop")
         {
             cb(path);
         }
