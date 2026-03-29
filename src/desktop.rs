@@ -160,7 +160,23 @@ pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
 
 pub fn parse_bool(value: &str) -> bool {
     let value = value.trim();
-    value.eq_ignore_ascii_case("true") || value == "1" || value.eq_ignore_ascii_case("yes")
+    if value.is_empty() {
+        return false;
+    }
+    // Optimization: Check the first byte of the string before proceeding
+    // with a full `eq_ignore_ascii_case` match, skipping unneeded comparison
+    // operations for simple boolean string matching.
+    let b = value.as_bytes()[0];
+    if b == b'1' && value.len() == 1 {
+        return true;
+    }
+    if b.eq_ignore_ascii_case(&b't') && value.eq_ignore_ascii_case("true") {
+        return true;
+    }
+    if b.eq_ignore_ascii_case(&b'y') && value.eq_ignore_ascii_case("yes") {
+        return true;
+    }
+    false
 }
 
 fn desktop_list_matches(value: &str, current_desktops: &[String]) -> bool {
