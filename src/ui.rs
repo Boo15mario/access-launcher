@@ -95,7 +95,7 @@ pub fn show_error_dialog(parent: &impl IsA<gtk::Window>, title: &str, details: &
 pub fn update_program_list(
     list_box: &gtk::ListBox,
     entries: &[DesktopEntry],
-    category_map: &BTreeMap<String, Vec<usize>>,
+    category_map: &BTreeMap<&str, Vec<usize>>,
     category: &str,
 ) {
     while let Some(child) = list_box.first_child() {
