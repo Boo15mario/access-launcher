@@ -41,3 +41,6 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+## 2026-03-31 - Zero-Allocation Environment Variable Parsing
+**Learning:** Converting separated list strings (like `XDG_CURRENT_DESKTOP`) into `Vec<String>` incurs N allocations. Storing the single owned string and creating a `Vec<&str>` of slices reduces allocations dramatically and improves parsing performance.
+**Action:** When parsing lists from environment variables, use zero-allocation slices `&str` derived from the single owned `String`.
