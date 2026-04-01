@@ -164,12 +164,14 @@ pub fn parse_bool(value: &str) -> bool {
 }
 
 fn desktop_list_matches(value: &str, current_desktops: &[String]) -> bool {
-    for part in value.split(';') {
+    // Optimization: split on bytes instead of UTF-8 characters
+    // avoids utf8 character boundaries check on every char.
+    for part in value.as_bytes().split(|&b| b == b';') {
         if part.is_empty() {
             continue;
         }
         for desktop in current_desktops {
-            if desktop == part {
+            if desktop.as_bytes() == part {
                 return true;
             }
         }
