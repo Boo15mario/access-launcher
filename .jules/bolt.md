@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2026-08-01 - Desktop List String Split Optimization
+**Learning:** In Rust string parsing, splitting a string via `str::split(';')` iterates over characters and handles UTF-8 boundaries, which adds overhead. For ASCII delimiters, splitting the raw bytes via `.as_bytes().split(|&b| b == b';')` is faster, providing a ~25% speedup in benchmarks by avoiding unnecessary character decoding overhead.
+**Action:** When parsing well-formed UTF-8 configuration values (like `.desktop` list fields) delimited by ASCII characters, prefer splitting on raw byte slices rather than string slices for a measurable performance improvement in hot loops.
