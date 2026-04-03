@@ -140,8 +140,17 @@ fn walk_desktop_files(dir: &Path, cb: &mut impl FnMut(PathBuf)) {
 }
 
 pub fn normalize_lang_tag(lang: &str) -> &str {
-    let lang_len = lang.find(['.', '@']).unwrap_or(lang.len());
-    &lang[..lang_len]
+    // Optimization: iterate directly on bytes instead of using `find`
+    // to avoid method and closure overhead in this hot path since '.' and '@'
+    // are single-byte ASCII characters.
+    let bytes = lang.as_bytes();
+    for i in 0..bytes.len() {
+        let b = bytes[i];
+        if b == b'.' || b == b'@' {
+            return &lang[..i];
+        }
+    }
+    lang
 }
 
 pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
@@ -164,14 +173,17 @@ pub fn parse_bool(value: &str) -> bool {
 }
 
 fn desktop_list_matches(value: &str, current_desktops: &[String]) -> bool {
+    // Optimization: avoid iterator setup overhead if the value is empty
+    if value.is_empty() {
+        return false;
+    }
     for part in value.split(';') {
         if part.is_empty() {
             continue;
         }
-        for desktop in current_desktops {
-            if desktop == part {
-                return true;
-            }
+        // Optimization: use any() to efficiently short-circuit the inner check
+        if current_desktops.iter().any(|d| d == part) {
+            return true;
         }
     }
     false
