@@ -67,7 +67,8 @@ Categories=Utility;Development;
         "access-launcher-core",
     );
     let mut line_buf = String::new();
-    let entry = parse_desktop_entry(&file.path, None, None, &mut line_buf).expect("entry present");
+    let entry = parse_desktop_entry(&file.path, None, None::<&[String]>, &mut line_buf)
+        .expect("entry present");
     assert_eq!(entry.name, "Sample App");
     assert_eq!(entry.exec, "sample --flag");
     assert_eq!(entry.categories, "Utility;Development;");
@@ -86,8 +87,13 @@ Exec=app
         "access-launcher-localized",
     );
     let mut line_buf = String::new();
-    let entry = parse_desktop_entry(&file.path, Some("en_US.UTF-8"), None, &mut line_buf)
-        .expect("entry present");
+    let entry = parse_desktop_entry(
+        &file.path,
+        Some("en_US.UTF-8"),
+        None::<&[String]>,
+        &mut line_buf,
+    )
+    .expect("entry present");
     assert_eq!(entry.name, "Localized Name");
 }
 
@@ -123,7 +129,7 @@ OnlyShowIn=GNOME;
         "access-launcher-only-show-in-none",
     );
     let mut line_buf = String::new();
-    assert!(parse_desktop_entry(&file.path, None, None, &mut line_buf).is_some());
+    assert!(parse_desktop_entry(&file.path, None, None::<&[String]>, &mut line_buf).is_some());
 }
 
 #[test]
@@ -156,7 +162,8 @@ Exec=app
         "access-launcher-fallback",
     );
     let mut line_buf = String::new();
-    let entry = parse_desktop_entry(&file.path, None, None, &mut line_buf).expect("entry present");
+    let entry = parse_desktop_entry(&file.path, None, None::<&[String]>, &mut line_buf)
+        .expect("entry present");
     let stem = file
         .path
         .file_stem()
