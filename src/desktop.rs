@@ -163,15 +163,16 @@ pub fn parse_bool(value: &str) -> bool {
     value.eq_ignore_ascii_case("true") || value == "1" || value.eq_ignore_ascii_case("yes")
 }
 
-fn desktop_list_matches(value: &str, current_desktops: &[String]) -> bool {
+fn desktop_list_matches(value: &str, current_desktops: &[impl AsRef<str>]) -> bool {
+    if value.is_empty() {
+        return false;
+    }
     for part in value.split(';') {
         if part.is_empty() {
             continue;
         }
-        for desktop in current_desktops {
-            if desktop == part {
-                return true;
-            }
+        if current_desktops.iter().any(|d| d.as_ref() == part) {
+            return true;
         }
     }
     false
@@ -180,7 +181,7 @@ fn desktop_list_matches(value: &str, current_desktops: &[String]) -> bool {
 pub fn parse_desktop_entry(
     path: &Path,
     current_lang: Option<&str>,
-    current_desktops: Option<&[String]>,
+    current_desktops: Option<&[impl AsRef<str>]>,
     line_buf: &mut String,
 ) -> Option<DesktopEntry> {
     let file = fs::File::open(path).ok()?;
@@ -371,11 +372,11 @@ fn cmp_ignore_ascii_case(a: &str, b: &str) -> std::cmp::Ordering {
 
 pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
     let current_lang = env::var("LANG").ok();
-    let current_desktops = env::var("XDG_CURRENT_DESKTOP").ok().map(|value| {
+    let current_desktops_env = env::var("XDG_CURRENT_DESKTOP").ok();
+    let current_desktops = current_desktops_env.as_ref().map(|value| {
         value
             .split(':')
             .filter(|entry| !entry.is_empty())
-            .map(|entry| entry.to_string())
             .collect::<Vec<_>>()
     });
 
