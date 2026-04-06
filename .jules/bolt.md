@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2024-04-06 - Avoid Vec<String> allocations when splitting environment variables for filtering
+**Learning:** When parsing environment variables (like `XDG_CURRENT_DESKTOP`) to filter entries repeatedly, calling `.map(|s| s.to_string()).collect::<Vec<_>>()` forces a heap allocation for every chunk. In hot paths (like parsing 1000+ desktop files and checking `.split(';')` segments against this list), keeping these owned strings alive introduces unnecessary allocation overhead at initialization.
+**Action:** When filtering against a single environment variable string that lives for the duration of the function, parse it directly into a `Vec<&str>` (`.collect::<Vec<_>>()`) after allocating the base string once. Update generic bounds on consuming functions to accept `&[impl AsRef<str>]` so they can seamlessly work with both owned `String` test fixtures and zero-allocation `&str` references in production.
