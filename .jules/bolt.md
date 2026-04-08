@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2026-08-01 - Avoid Per-Item Allocations When Filtering with Environment Variables
+**Learning:** Calling `.to_string()` inside an iterator map directly off an environment variable parse (like `XDG_CURRENT_DESKTOP`) causes an allocation for every component. By resolving the environment variable into a single owned string first, we can derive borrowed slices (`&str`) and match them against `&[impl AsRef<str>]` in down-stream functions, dropping the allocations entirely.
+**Action:** When filtering a dataset based on a parsed environment variable, store the parsed string once and process iterators using zero-allocation string slices (`&str`) by leveraging `impl AsRef<str>` on downstream parameters.
