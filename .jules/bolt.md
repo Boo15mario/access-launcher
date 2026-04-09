@@ -1,43 +1,7 @@
-## 2026-01-27 - Partial File Parsing Optimization
-**Learning:** Even for small files like .desktop entries, `fs::read_to_string` can be a bottleneck if we only need the header. Using `BufReader` with a reusable string buffer reduced parsing time by ~16% by avoiding full file reads and repeated allocations.
-**Action:** When parsing file headers or specific sections, prefer streaming with `BufReader` over reading the entire file into memory, especially in hot loops.
+## 2024-05-18 - Language Tag Matching Fast Path
+**Learning:** Checking the first byte of `tag` and `lang` for exact mismatch (`if tag.as_bytes()[0] != lang.as_bytes()[0]`) before executing expensive string slicing and finding (`.find(['.', '@'])`) provides a measurable ~19% speedup when scanning a large number of unsupported localized keys in `.desktop` files.
+**Action:** When performing substring or transformed comparisons in hot parsing loops, eagerly test the first byte if the keys usually start with distinct characters.
 
-## 2026-05-22 - Redundant Sorting Removal
-**Learning:** Sorting categorized subsets of data is redundant if the superset is already sorted and iteration order is preserved. By relying on `collect_desktop_entries` pre-sorting, we removed $O(N \log N)$ work and $N$ string allocations inside `build_category_map`.
-**Action:** Always check if input data guarantees an ordering that allows skipping downstream sorts.
-
-## 2026-06-15 - Shell Argument Parsing Optimization
-**Learning:** `glib::shell_parse_argv` involves FFI and allocation which can be significant in a hot loop. For simple shell commands (no quotes, no escapes), manual string splitting and path checking is ~10x faster for relative commands and ~1.25x faster for absolute paths.
-**Action:** When validating shell commands in a loop, implement a fast path for unquoted strings to avoid FFI overhead.
-
-## 2026-06-25 - Shadowing Logic Optimization
-**Learning:** Checking for file existence (ID shadowing) before parsing is significantly faster than parsing and then checking validity. Correct XDG shadowing requires masking lower-priority files even if the high-priority file is hidden or invalid.
-**Action:** When implementing shadowing/overrides, use a `HashSet` of seen IDs to eagerly skip processing of lower-priority items.
-
-## 2026-06-26 - Lazy Parsing Trade-offs
-**Learning:** Delaying allocations for frequently present fields like `Categories` (Vec<String>) can be counter-productive due to the overhead of buffering the raw string (extra allocation/copy). However, for fields used primarily for filtering (like `OnlyShowIn`), storing the raw string and validating lazily avoids vector allocations entirely, which is a win.
-**Action:** Use lazy parsing/validation for optional filter fields, but parse required/common fields eagerly to avoid double-allocation penalties.
-
-## 2026-06-27 - Map Key Allocation
-**Learning:** `BTreeMap::entry(key)` takes ownership of the key, forcing allocation if the key is `String`. Using `get_mut` with `&str` avoids this allocation for lookups.
-**Action:** When working with `BTreeMap<String, V>` (or `HashMap`), use `get_mut` or `get` with `&str` for lookups to avoid allocation, and only allocate when inserting.
-
-## 2026-07-15 - Zero-Allocation Parsing Loop
-**Learning:** For high-volume file parsing (like scanning hundreds of .desktop files), allocating a new `String` buffer for each file's `read_line` loop adds significant overhead. Passing a reusable mutable buffer from the caller eliminated these repeated allocations.
-**Action:** When parsing many files in a loop, lift the buffer allocation out of the parsing function and pass it as `&mut String`.
-
-## 2026-07-15 - Streamlined Directory Traversal
-**Learning:** Collecting all file paths into a `Vec<PathBuf>` before processing them consumes unnecessary memory and delays processing. Using a `FnMut` callback allows processing files immediately as they are discovered, improving cache locality and reducing peak memory usage.
-**Action:** Prefer callback-based traversal over collecting results into a vector when the consumer processes items sequentially.
-
-## 2026-02-04 - Raw String Storage for Categories
-**Learning:** Storing list-like fields (e.g., `Categories`) as `Vec<String>` in high-cardinality structs causes significant allocation overhead (N+1 allocations per entry). Storing the raw delimited string and parsing it lazily via iterators reduced allocations by ~75% for that field and improved parsing throughput by ~6%.
-**Action:** For fields that are parsed eagerly but accessed infrequently or read-only, store the raw string data and use iterator-based accessors instead of eagerly collecting into a Vector.
-
-## 2026-02-22 - Single-Pass Category Mapping
-**Learning:** Iterating over a split string multiple times for category checks (O(M*N)) is inefficient compared to a single pass with integer-based prioritization (O(N)). Switching to a single-pass `match` loop reduced category mapping time by ~3x (28ms to 9ms for 100k entries).
-**Action:** When mapping a list of items to a single prioritized result, prefer a single pass that updates a "best so far" variable over multiple passes checking for each possibility.
-
-## 2026-02-25 - Early Exit for Ignored Entries
-**Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
-**Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+## 2024-05-18 - Avoiding Allocation with Env Var String Slices
+**Learning:** `XDG_CURRENT_DESKTOP` parsing used to split the env var and map each segment into an owned `String`, creating an allocating `Vec<String>`. Keeping the raw env var string alive and producing `Vec<&str>` skips allocations and speeds up initialization significantly (~55% speedup in benchmark).
+**Action:** In function signatures that accept slices of string-like data (e.g., filtering logic), use `Option<&[impl AsRef<str>]>` rather than `Option<&[String]>` so the caller isn't forced to allocate when they possess borrowed slices.
