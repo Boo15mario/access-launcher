@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2026-07-28 - Fast Rejection for String Matching
+**Learning:** When matching parsed string prefixes against a known value, especially in configurations with high cardinality of non-matching values (like `Name[lang]=...` lines where only one `lang` matches), implementing a fast-rejection check by comparing the first byte (`tag.as_bytes()[0] != lang.as_bytes()[0]`) provides significant performance improvements by avoiding slice allocations and full string comparisons. In addition, the standard library `.split()` is often faster than `.find()` followed by manual slice indexing.
+**Action:** When repeatedly comparing keys to a single target, especially for localized keys, evaluate adding an early byte comparison to fast-reject non-matches.
