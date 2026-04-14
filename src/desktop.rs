@@ -148,6 +148,10 @@ pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
     if tag.is_empty() || lang.is_empty() {
         return false;
     }
+    // Optimization: Fast rejection on first byte to avoid string processing
+    if tag.as_bytes()[0] != lang.as_bytes()[0] {
+        return false;
+    }
     let lang = normalize_lang_tag(lang);
     match lang.len().cmp(&tag.len()) {
         std::cmp::Ordering::Equal => lang == tag,
