@@ -41,3 +41,6 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+## 2024-05-20 - Fast Rejection in Locale Matching
+**Learning:** When checking localized keys (like `Name[fr]`) against a target language (`en_US`), many candidates completely differ at the first byte. The `normalize_lang_tag` processing (finding separators and slicing) is pure overhead for these hard mismatches.
+**Action:** Always consider checking the first byte for early rejection (`if a.as_bytes()[0] != b.as_bytes()[0] { return false; }`) *before* executing slicing or normalization logic in string matching hot paths.
