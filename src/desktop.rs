@@ -148,6 +148,10 @@ pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
     if tag.is_empty() || lang.is_empty() {
         return false;
     }
+    // Fast rejection: different first bytes mean different strings.
+    if tag.as_bytes()[0] != lang.as_bytes()[0] {
+        return false;
+    }
     let lang = normalize_lang_tag(lang);
     match lang.len().cmp(&tag.len()) {
         std::cmp::Ordering::Equal => lang == tag,
@@ -361,9 +365,11 @@ fn cmp_ignore_ascii_case(a: &str, b: &str) -> std::cmp::Ordering {
         if c1 == c2 {
             continue;
         }
-        match c1.to_ascii_lowercase().cmp(&c2.to_ascii_lowercase()) {
-            std::cmp::Ordering::Equal => continue,
-            ord => return ord,
+        let c1_lower = c1.to_ascii_lowercase();
+        let c2_lower = c2.to_ascii_lowercase();
+        if c1_lower != c2_lower {
+            // Optimization: avoiding match block branching overhead
+            return c1_lower.cmp(&c2_lower);
         }
     }
     a_bytes.len().cmp(&b_bytes.len())
