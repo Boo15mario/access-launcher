@@ -159,11 +159,27 @@ pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
 }
 
 pub fn parse_bool(value: &str) -> bool {
+    // Optimization: Avoid setting up case-insensitive comparison iterators
+    // by branching on length first, since we know the expected target lengths.
+    // Also see: desktop_list_matches
     let value = value.trim();
-    value.eq_ignore_ascii_case("true") || value == "1" || value.eq_ignore_ascii_case("yes")
+    let len = value.len();
+    if len == 4 {
+        value.eq_ignore_ascii_case("true")
+    } else if len == 1 {
+        value == "1"
+    } else if len == 3 {
+        value.eq_ignore_ascii_case("yes")
+    } else {
+        false
+    }
 }
 
 fn desktop_list_matches(value: &str, current_desktops: &[String]) -> bool {
+    // Optimization: avoid iterator setup overhead for empty values
+    if value.is_empty() {
+        return false;
+    }
     for part in value.split(';') {
         if part.is_empty() {
             continue;
