@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2024-05-18 - Fast String Parsing in Rust
+**Learning:** In Rust string parsing, `line.split_once('=')` combined with `.trim_ascii()` is faster for key-value extraction than `.find('=')` followed by string slicing and `.trim()`. Additionally, when parsing small known strings (e.g., booleans), checking `.len()` before performing string comparisons can significantly improve performance by short-circuiting comparisons and avoiding iterator overhead.
+**Action:** When extracting key-value pairs or parsing simple known strings in performance-critical paths, prefer `split_once`, `trim_ascii`, and length matching to reduce overhead.
