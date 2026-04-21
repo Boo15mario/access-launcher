@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2026-07-20 - Boolean Parsing Optimization
+**Learning:** In Rust, `trim_ascii()` combined with length-based short-circuiting (`match value.len()`) significantly outperforms sequential `.eq_ignore_ascii_case()` calls for parsing small known strings (like booleans). This avoids both full Unicode whitespace checks and unnecessary byte-by-byte comparisons.
+**Action:** When parsing simple configuration values (booleans, small enums), prefer `trim_ascii()` over `trim()`, and use length-matching jumps to quickly reject invalid inputs or route to specific checks.
