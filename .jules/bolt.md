@@ -41,3 +41,11 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2026-06-28 - String Check Micro-optimizations Anti-Pattern
+**Learning:** In Rust, attempting to short-circuit small string matching (like boolean values 'true', '1', 'yes') by checking the first byte (`value.as_bytes()[0]`) can actually introduce branching overhead that makes it slower than consecutive standard library `.eq_ignore_ascii_case()` comparisons. The baseline desktop parsing is already highly optimized (~24-26ms per 1000 files). Micro-optimizations like substituting `HashSet`/`BTreeMap` insertion methods or altering `split` iterator iteration logic yielded no measurable speedup and should be avoided.
+**Action:** Always benchmark micro-optimizations. Do not replace idiomatic standard library string methods (like `find` or `starts_with` or `.ends_with`) with manual byte iteration loops.
+
+## 2026-06-29 - Exec Validation String Optimization
+**Learning:** In `exec_looks_valid`, checking if a string contains any of multiple characters (e.g., `['"', '\'', '\\']`) using `contains` is measurably slower (~2x slower in microbenchmarks) than a simple iterator check `!exec.as_bytes().iter().any(|&b| b == b'"' || b == b'\'' || b == b'\\')`.
+**Action:** When searching for multiple specific ASCII bytes in a string in a hot path, using `.as_bytes().iter().any()` is faster than `.contains([char array])`.
