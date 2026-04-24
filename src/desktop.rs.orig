@@ -326,13 +326,8 @@ pub fn exec_looks_valid(exec: &str) -> bool {
     }
 
     // Optimization: avoid glib parse/allocation for common cases.
-    // Checking bytes via iter().any() is ~1.9x faster than contains() with an array of chars.
     // Most Exec lines are simple commands or absolute paths without quotes.
-    if !exec
-        .as_bytes()
-        .iter()
-        .any(|&b| b == b'"' || b == b'\'' || b == b'\\')
-    {
+    if !exec.contains(['"', '\'', '\\']) {
         let command = exec.split_whitespace().next().unwrap_or("");
         if command.starts_with('/') {
             return Path::new(command).exists();
@@ -366,9 +361,10 @@ fn cmp_ignore_ascii_case(a: &str, b: &str) -> std::cmp::Ordering {
         if c1 == c2 {
             continue;
         }
-        match c1.to_ascii_lowercase().cmp(&c2.to_ascii_lowercase()) {
-            std::cmp::Ordering::Equal => continue,
-            ord => return ord,
+        let l1 = c1.to_ascii_lowercase();
+        let l2 = c2.to_ascii_lowercase();
+        if l1 != l2 {
+            return l1.cmp(&l2);
         }
     }
     a_bytes.len().cmp(&b_bytes.len())
