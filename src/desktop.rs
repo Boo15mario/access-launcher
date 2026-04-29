@@ -123,18 +123,19 @@ fn walk_desktop_files(dir: &Path, cb: &mut impl FnMut(PathBuf)) {
     };
 
     for entry in entries.flatten() {
-        let path = entry.path();
         let file_type = match entry.file_type() {
             Ok(file_type) => file_type,
             Err(_) => continue,
         };
 
         if file_type.is_dir() {
-            walk_desktop_files(&path, cb);
-        } else if (file_type.is_file() || file_type.is_symlink())
-            && path.extension().and_then(|ext| ext.to_str()) == Some("desktop")
-        {
-            cb(path);
+            walk_desktop_files(&entry.path(), cb);
+        } else if file_type.is_file() || file_type.is_symlink() {
+            let name = entry.file_name();
+            // Optimization: evaluate file extension before allocating full path buffer
+            if Path::new(&name).extension().and_then(|ext| ext.to_str()) == Some("desktop") {
+                cb(entry.path());
+            }
         }
     }
 }
