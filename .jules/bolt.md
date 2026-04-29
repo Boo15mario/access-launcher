@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2026-07-25 - Deferring PathBuf Allocation
+**Learning:** During directory traversal (`fs::read_dir`), eagerly constructing the full path via `entry.path()` incurs an allocation on every single entry. If many entries are discarded based on their file name or type, this overhead is significant. Extracting the `file_name` to evaluate extensions before constructing the full path avoids this allocation for non-target files.
+**Action:** In `read_dir` traversal loops, evaluate `entry.file_type()` and `entry.file_name()` to filter out irrelevant items *before* allocating the full `entry.path()`.
