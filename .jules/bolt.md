@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2026-07-28 - String Processing Micro-optimizations
+**Learning:** In hot execution paths, using byte iteration (`.as_bytes().iter().any(...)`) for checking single-byte ASCII characters avoids the UTF-8 boundary decoding overhead associated with `std::str::contains`. Additionally, adding early returns for empty strings before setting up split iterators avoids unnecessary overhead.
+**Action:** When validating simple strings in hot loops, consider byte iteration for ASCII char checks and fast-path early returns for empty strings.
