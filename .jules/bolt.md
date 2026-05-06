@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2026-07-28 - Delayed PathBuf Allocation in Traversal
+**Learning:** In Rust directory traversal using `fs::read_dir`, allocating a full `PathBuf` via `entry.path()` for every file is an expensive operation that can bottleneck performance when filtering a large number of files. Waiting to extract the extension from `entry.file_name()` (which is an `OsString` and cheaper to obtain) before allocating the `PathBuf` avoids unnecessary heap allocations for non-target files, providing a measurable performance speedup.
+**Action:** When walking directories and filtering by extension or filename, evaluate `entry.file_type()` and check conditions against `entry.file_name()` before calling `entry.path()` to delay or avoid `PathBuf` allocation.
