@@ -148,13 +148,19 @@ pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
     if tag.is_empty() || lang.is_empty() {
         return false;
     }
+    // Optimization: Fast path for exact matches avoids normalization overhead
+    if tag == lang {
+        return true;
+    }
     let lang = normalize_lang_tag(lang);
-    match lang.len().cmp(&tag.len()) {
-        std::cmp::Ordering::Equal => lang == tag,
-        std::cmp::Ordering::Greater => {
-            lang.starts_with(tag) && lang.as_bytes().get(tag.len()) == Some(&b'_')
-        }
-        std::cmp::Ordering::Less => tag.starts_with(lang),
+    // Optimization: Fast path after normalization
+    if tag == lang {
+        return true;
+    }
+    if lang.len() > tag.len() {
+        lang.starts_with(tag) && lang.as_bytes()[tag.len()] == b'_'
+    } else {
+        tag.starts_with(lang)
     }
 }
 
