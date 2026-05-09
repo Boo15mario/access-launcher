@@ -327,7 +327,12 @@ pub fn exec_looks_valid(exec: &str) -> bool {
 
     // Optimization: avoid glib parse/allocation for common cases.
     // Most Exec lines are simple commands or absolute paths without quotes.
-    if !exec.contains(['"', '\'', '\\']) {
+    // Using explicit byte checking is significantly faster than searching arrays of chars
+    if !exec
+        .as_bytes()
+        .iter()
+        .any(|&b| b == b'"' || b == b'\'' || b == b'\\')
+    {
         let command = exec.split_whitespace().next().unwrap_or("");
         if command.starts_with('/') {
             return Path::new(command).exists();
