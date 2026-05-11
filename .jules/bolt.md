@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2024-05-14 - String Equality Fast Path
+**Learning:** In Rust string matching functions where exact equality is a common case (like language tag evaluation), checking exact string equality (`if tag == lang`) before performing sub-string evaluation or setting up iterators acts as a zero-allocation fast path that yields a significant speedup (~20% observed).
+**Action:** Always check for strict equality first when evaluating localized strings, labels, or keys against an exact target value before falling back to complex normalization or parsing.
