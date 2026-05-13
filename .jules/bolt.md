@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2026-07-25 - Fast String Containment Check
+**Learning:** In Rust, checking if a string contains specific single-byte ASCII characters using byte-wise iteration `.as_bytes().iter().any(|&b| ...)` is significantly faster than using `.contains(['char1', 'char2'])`, as the latter forces UTF-8 character boundary decoding overhead.
+**Action:** When searching for single-byte ASCII chars in hot paths, prefer byte-wise iteration over `.contains()` with an array of characters.
