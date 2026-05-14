@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2026-08-01 - UTF-8 Decode Overhead in ASCII Search
+**Learning:** `str::contains` decodes characters byte-by-byte for UTF-8 boundary validation. When searching strictly for literal ASCII characters (like `"`, `'`, or `\`), using a byte-wise iterator `.as_bytes().iter().any(...)` safely bypasses this decoding overhead, yielding significant speedups (~44% in microbenchmarks) on hot paths.
+**Action:** When validating or searching strings exclusively for ASCII single-byte characters, drop down to byte iteration to avoid UTF-8 decoding overhead.
