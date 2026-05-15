@@ -140,11 +140,18 @@ fn walk_desktop_files(dir: &Path, cb: &mut impl FnMut(PathBuf)) {
 }
 
 pub fn normalize_lang_tag(lang: &str) -> &str {
-    let lang_len = lang.find(['.', '@']).unwrap_or(lang.len());
+    let lang_len = lang
+        .bytes()
+        .position(|b| matches!(b, b'.' | b'@'))
+        .unwrap_or(lang.len());
     &lang[..lang_len]
 }
 
 pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
+    // Optimization: fast path for exact matches avoids normalization overhead
+    if tag == lang {
+        return true;
+    }
     if tag.is_empty() || lang.is_empty() {
         return false;
     }
