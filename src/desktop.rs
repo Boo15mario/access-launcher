@@ -140,7 +140,12 @@ fn walk_desktop_files(dir: &Path, cb: &mut impl FnMut(PathBuf)) {
 }
 
 pub fn normalize_lang_tag(lang: &str) -> &str {
-    let lang_len = lang.find(['.', '@']).unwrap_or(lang.len());
+    // Optimization: find() on char arrays incurs UTF-8 decoding overhead.
+    // Since '.' and '@' are single-byte ASCII characters, byte-wise position is faster.
+    let lang_len = lang
+        .bytes()
+        .position(|b| matches!(b, b'.' | b'@'))
+        .unwrap_or(lang.len());
     &lang[..lang_len]
 }
 

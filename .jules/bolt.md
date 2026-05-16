@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2026-07-20 - Fast ASCII Character Search
+**Learning:** In Rust, searching for single-byte ASCII separators in strings using `.find(['char1', 'char2'])` incurs UTF-8 character boundary decoding overhead. Using `.bytes().position(|b| matches!(b, b'char1' | b'char2'))` avoids this and is significantly faster for ASCII matching.
+**Action:** When checking if a string contains specific single-byte ASCII characters, prefer byte-wise iteration over `.find()` or `.contains()` with char arrays to bypass UTF-8 overhead.
