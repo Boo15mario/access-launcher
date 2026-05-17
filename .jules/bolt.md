@@ -41,3 +41,6 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+## 2024-05-17 - [Faster ASCII Separator Search in Strings]
+**Learning:** In Rust, searching for ASCII separators in strings using `.bytes().position(|b| matches!(b, b'.' | b'@'))` is significantly faster than using `.find(['.', '@'])`, as it avoids UTF-8 character boundary decoding overhead.
+**Action:** Prefer byte-wise position matching for ASCII characters in hot paths instead of `find` with char arrays.
