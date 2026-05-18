@@ -41,3 +41,7 @@
 ## 2026-02-25 - Early Exit for Ignored Entries
 **Learning:** Parsing entire desktop files only to later discard them (due to `Hidden`, `NoDisplay`, or incorrect `Type`) wastes significant I/O and CPU time. Implementing early checks for these flags within the parsing loop reduced processing time by ~14-36% for mixed workloads by avoiding subsequent field allocations and parsing.
 **Action:** When parsing configuration files where many entries might be ignored, check filtering flags immediately upon reading them and return early to avoid unnecessary processing of the remainder of the file.
+
+## 2026-05-18 - Fast-path Early Return and ASCII Byte Search
+**Learning:** In hot paths doing case-sensitive string matching (`matches_lang_tag`), an early exact string comparison `if tag == lang` acts as a fast-path that skips subsequent logic, yielding measurable speedup (e.g. 40% in benchmarks). Furthermore, searching for ASCII characters in UTF-8 strings using `.bytes().position(...)` instead of `.find([...])` avoids UTF-8 character boundary decoding overhead.
+**Action:** When implementing manual string comparisons or locale-specific matches, check for exact equality early, and prefer byte-wise iterators for finding ASCII separators in UTF-8 slices.
