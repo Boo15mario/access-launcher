@@ -1,0 +1,20 @@
+--- src/desktop.rs
++++ src/desktop.rs
+@@ -107,7 +107,7 @@
+ }
+
+ pub fn normalize_lang_tag(lang: &str) -> &str {
+-    let lang_len = lang.find(['.', '@']).unwrap_or(lang.len());
++    let lang_len = lang.bytes().position(|b| matches!(b, b'.' | b'@')).unwrap_or(lang.len());
+     &lang[..lang_len]
+ }
+
+@@ -253,7 +253,7 @@
+
+     // Optimization: avoid glib parse/allocation for common cases.
+     // Most Exec lines are simple commands or absolute paths without quotes.
+-    if !exec.contains(['"', '\'', '\\']) {
++    if !exec.bytes().any(|b| matches!(b, b'"' | b'\'' | b'\\')) {
+         let command = exec.split_whitespace().next().unwrap_or("");
+         if command.starts_with('/') {
+             return Path::new(command).exists();
