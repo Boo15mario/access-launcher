@@ -45,6 +45,26 @@ fn matches_lang_tag_handles_prefixes() {
 }
 
 #[test]
+fn matches_lang_tag_fast_paths() {
+    assert!(matches_lang_tag("en_US", "en_US"));
+    assert!(matches_lang_tag("de", "de_DE.UTF-8@euro"));
+    assert!(matches_lang_tag("de_DE", "de_DE@euro"));
+    assert!(!matches_lang_tag("fr", "en_US.UTF-8"));
+    assert!(!matches_lang_tag("en_GB", "en_US.UTF-8"));
+    assert!(!matches_lang_tag("e", "en_US"));
+}
+
+#[test]
+fn parse_bool_rejects_near_misses_and_trims() {
+    assert!(parse_bool("  TRUE \t"));
+    assert!(parse_bool("Yes"));
+    assert!(!parse_bool(""));
+    assert!(!parse_bool("yess"));
+    assert!(!parse_bool("tru"));
+    assert!(!parse_bool("11"));
+}
+
+#[test]
 fn parse_bool_accepts_common_true_values() {
     assert!(parse_bool("true"));
     assert!(parse_bool("1"));
@@ -103,8 +123,8 @@ OnlyShowIn=GNOME;
 "#,
         "access-launcher-only-show-in",
     );
-    let gnome = vec!["GNOME".to_string()];
-    let kde = vec!["KDE".to_string()];
+    let gnome = vec!["GNOME"];
+    let kde = vec!["KDE"];
     let mut line_buf = String::new();
     assert!(parse_desktop_entry(&file.path, None, Some(&gnome), &mut line_buf).is_some());
     assert!(parse_desktop_entry(&file.path, None, Some(&kde), &mut line_buf).is_none());
@@ -138,11 +158,30 @@ NotShowIn=GNOME;
 "#,
         "access-launcher-not-show-in",
     );
-    let gnome = vec!["GNOME".to_string()];
-    let kde = vec!["KDE".to_string()];
+    let gnome = vec!["GNOME"];
+    let kde = vec!["KDE"];
     let mut line_buf = String::new();
     assert!(parse_desktop_entry(&file.path, None, Some(&kde), &mut line_buf).is_some());
     assert!(parse_desktop_entry(&file.path, None, Some(&gnome), &mut line_buf).is_none());
+}
+
+#[test]
+fn parse_desktop_entry_matches_any_of_multiple_current_desktops() {
+    let file = TempFile::new(
+        r#"
+[Desktop Entry]
+Type=Application
+Name=Desktop Filter
+Exec=app
+OnlyShowIn=;GNOME;
+"#,
+        "access-launcher-multi-desktop",
+    );
+    let ubuntu_gnome = vec!["ubuntu", "GNOME"];
+    let kde = vec!["KDE", "Plasma"];
+    let mut line_buf = String::new();
+    assert!(parse_desktop_entry(&file.path, None, Some(&ubuntu_gnome), &mut line_buf).is_some());
+    assert!(parse_desktop_entry(&file.path, None, Some(&kde), &mut line_buf).is_none());
 }
 
 #[test]
