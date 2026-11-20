@@ -123,30 +123,49 @@ fn walk_desktop_files(dir: &Path, cb: &mut impl FnMut(PathBuf)) {
     };
 
     for entry in entries.flatten() {
-        let path = entry.path();
         let file_type = match entry.file_type() {
             Ok(file_type) => file_type,
             Err(_) => continue,
         };
 
         if file_type.is_dir() {
-            walk_desktop_files(&path, cb);
-        } else if (file_type.is_file() || file_type.is_symlink())
-            && path.extension().and_then(|ext| ext.to_str()) == Some("desktop")
-        {
-            cb(path);
+            walk_desktop_files(&entry.path(), cb);
+        } else if file_type.is_file() || file_type.is_symlink() {
+            // Check the extension on the bare file name first so we only build
+            // a full PathBuf for files we actually hand to the callback.
+            let file_name = entry.file_name();
+            if Path::new(&file_name)
+                .extension()
+                .and_then(|ext| ext.to_str())
+                == Some("desktop")
+            {
+                cb(entry.path());
+            }
         }
     }
 }
 
 pub fn normalize_lang_tag(lang: &str) -> &str {
-    let lang_len = lang.find(['.', '@']).unwrap_or(lang.len());
+    // '.' and '@' are ASCII, so a byte scan avoids UTF-8 decoding overhead.
+    let lang_len = lang
+        .bytes()
+        .position(|b| matches!(b, b'.' | b'@'))
+        .unwrap_or(lang.len());
     &lang[..lang_len]
 }
 
 pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
     if tag.is_empty() || lang.is_empty() {
         return false;
+    }
+    // Fast rejection: most localized keys (Name[fr], Name[de], ...) differ from
+    // the current language in the very first byte.
+    if tag.as_bytes()[0] != lang.as_bytes()[0] {
+        return false;
+    }
+    // Fast path: exact match needs no normalization.
+    if tag == lang {
+        return true;
     }
     let lang = normalize_lang_tag(lang);
     match lang.len().cmp(&tag.len()) {
@@ -159,28 +178,30 @@ pub fn matches_lang_tag(tag: &str, lang: &str) -> bool {
 }
 
 pub fn parse_bool(value: &str) -> bool {
-    let value = value.trim();
-    value.eq_ignore_ascii_case("true") || value == "1" || value.eq_ignore_ascii_case("yes")
+    // Dispatch on length so at most one comparison runs.
+    let value = value.trim_ascii();
+    match value.len() {
+        1 => value == "1",
+        3 => value.eq_ignore_ascii_case("yes"),
+        4 => value.eq_ignore_ascii_case("true"),
+        _ => false,
+    }
 }
 
-fn desktop_list_matches(value: &str, current_desktops: &[String]) -> bool {
-    for part in value.split(';') {
-        if part.is_empty() {
-            continue;
-        }
-        for desktop in current_desktops {
-            if desktop == part {
-                return true;
-            }
-        }
+fn desktop_list_matches(value: &str, current_desktops: &[&str]) -> bool {
+    if value.is_empty() {
+        return false;
     }
-    false
+    value
+        .split(';')
+        .filter(|part| !part.is_empty())
+        .any(|part| current_desktops.contains(&part))
 }
 
 pub fn parse_desktop_entry(
     path: &Path,
     current_lang: Option<&str>,
-    current_desktops: Option<&[String]>,
+    current_desktops: Option<&[&str]>,
     line_buf: &mut String,
 ) -> Option<DesktopEntry> {
     let file = fs::File::open(path).ok()?;
@@ -327,7 +348,8 @@ pub fn exec_looks_valid(exec: &str) -> bool {
 
     // Optimization: avoid glib parse/allocation for common cases.
     // Most Exec lines are simple commands or absolute paths without quotes.
-    if !exec.contains(['"', '\'', '\\']) {
+    // Byte scan for ASCII quote/escape characters avoids UTF-8 decoding.
+    if !exec.bytes().any(|b| matches!(b, b'"' | b'\'' | b'\\')) {
         let command = exec.split_whitespace().next().unwrap_or("");
         if command.starts_with('/') {
             return Path::new(command).exists();
@@ -371,13 +393,12 @@ fn cmp_ignore_ascii_case(a: &str, b: &str) -> std::cmp::Ordering {
 
 pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
     let current_lang = env::var("LANG").ok();
-    let current_desktops = env::var("XDG_CURRENT_DESKTOP").ok().map(|value| {
-        value
-            .split(':')
-            .filter(|entry| !entry.is_empty())
-            .map(|entry| entry.to_string())
-            .collect::<Vec<_>>()
-    });
+    // Borrow desktop names from the environment string instead of allocating
+    // a String for each one.
+    let xdg_current_desktop = env::var("XDG_CURRENT_DESKTOP").ok();
+    let current_desktops: Option<Vec<&str>> = xdg_current_desktop
+        .as_deref()
+        .map(|value| value.split(':').filter(|entry| !entry.is_empty()).collect());
 
     let mut entries = Vec::new();
     let mut seen_ids = HashSet::new();
@@ -417,20 +438,22 @@ pub fn collect_desktop_entries() -> Vec<DesktopEntry> {
     entries
 }
 
-pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<String, Vec<usize>> {
-    let mut map: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+/// Groups entry indices by display category. Keys are the `&'static str`
+/// names returned by `map_categories`, so no per-bucket String is allocated.
+pub fn build_category_map(entries: &[DesktopEntry]) -> BTreeMap<&'static str, Vec<usize>> {
+    let mut map: BTreeMap<&'static str, Vec<usize>> = BTreeMap::new();
     for (i, entry) in entries.iter().enumerate() {
         let bucket = map_categories(&entry.categories);
-        if let Some(list) = map.get_mut(bucket) {
-            list.push(i);
-        } else {
-            map.insert(bucket.to_string(), vec![i]);
-        }
+        map.entry(bucket).or_default().push(i);
     }
     map
 }
 
 fn map_categories(categories_raw: &str) -> &'static str {
+    if categories_raw.is_empty() {
+        return "Other";
+    }
+
     let mut best_priority = 100;
     let mut best_category = "Other";
 
