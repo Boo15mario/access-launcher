@@ -302,12 +302,10 @@ pub fn parse_desktop_entry(
                     return None;
                 }
             }
-            b'O' => {
-                if key == "OnlyShowIn" {
-                    if let Some(current_desktops) = current_desktops {
-                        if !desktop_list_matches(value, current_desktops) {
-                            return None;
-                        }
+            b'O' if key == "OnlyShowIn" => {
+                if let Some(current_desktops) = current_desktops {
+                    if !desktop_list_matches(value, current_desktops) {
+                        return None;
                     }
                 }
             }
